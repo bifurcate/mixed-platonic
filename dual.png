@@ -1,0 +1,79 @@
+graph g_graph {
+edge [color=black];
+node [shape=circle,style=filled,height=0.15,fixedsize=true,label="",fontsize=9,fontcolor="#751010"];
+g_0 [label=""]
+g_1 [label=""]
+g_2 [label=""]
+g_3 [label=""]
+g_4 [label=""]
+g_5 [label=""]
+g_6 [label=""]
+g_7 [label=""]
+g_8 [label=""]
+g_9 [label=""]
+g_10 [label=""]
+g_11 [label=""]
+g_12 [label=""]
+g_13 [label=""]
+g_14 [label=""]
+g_15 [label=""]
+g_16 [label=""]
+g_17 [label=""]
+g_18 [label=""]
+g_19 [label=""]
+g_20 [label=""]
+g_21 [label=""]
+g_22 [label=""]
+g_23 [label=""]
+g_24 [label=""]
+g_25 [label=""]
+g_26 [label=""]
+g_27 [label=""]
+g_28 [label=""]
+g_29 [label=""]
+g_0 -- g_1;
+g_0 -- g_3;
+g_0 -- g_26;
+g_1 -- g_2;
+g_1 -- g_4;
+g_2 -- g_3;
+g_2 -- g_6;
+g_3 -- g_5;
+g_4 -- g_29;
+g_4 -- g_5;
+g_5 -- g_10;
+g_6 -- g_7;
+g_6 -- g_9;
+g_7 -- g_8;
+g_7 -- g_10;
+g_8 -- g_9;
+g_8 -- g_12;
+g_9 -- g_11;
+g_10 -- g_11;
+g_11 -- g_16;
+g_12 -- g_13;
+g_12 -- g_15;
+g_13 -- g_14;
+g_13 -- g_16;
+g_14 -- g_15;
+g_14 -- g_18;
+g_15 -- g_17;
+g_16 -- g_17;
+g_17 -- g_22;
+g_18 -- g_19;
+g_18 -- g_21;
+g_19 -- g_20;
+g_19 -- g_22;
+g_20 -- g_21;
+g_20 -- g_24;
+g_21 -- g_23;
+g_22 -- g_23;
+g_23 -- g_28;
+g_24 -- g_25;
+g_24 -- g_27;
+g_25 -- g_26;
+g_25 -- g_28;
+g_26 -- g_27;
+g_27 -- g_29;
+g_28 -- g_29;
+}
