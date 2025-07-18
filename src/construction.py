@@ -3,6 +3,8 @@ from base import (
   SQR_EDGES,
   TET_PERMS,
   OCT_PERMS,
+  TET_FACES,
+  OCT_FACES,
   Tet,
   Oct,
   Tri,
@@ -10,6 +12,7 @@ from base import (
   CuspCell,
   ManifoldCell,
   EdgeSpec,
+  FaceSpec,
   CuspHalfEdge,
   ManifoldHalfFace,
   CuspEdgePairing,
@@ -52,6 +55,35 @@ class Cusp:
   def get_cell_pairings(self, cusp_cell: CuspCell) -> dict[EdgeSpec, CuspEdgePairing]:
     return self.X.get(cusp_cell)
   
+class ManifoldCellulation:
+  def __init__(self):
+    self.X = {}
+
+  def add_cell(self, cell: ManifoldCell):
+    self.X[cell] = {}
+  
+  def pair(
+    self,
+    manifold_cell_src: ManifoldCell,
+    face_spec_src: FaceSpec,
+    manifold_cell_tgt: CuspCell,
+    face_spec_tgt: FaceSpec,
+  ):
+    
+    face_spec_src, face_spec_tgt = normalize_face_pair(face_spec_src, face_spec_tgt)
+    
+    cp = ManifoldFacePairing(
+      ManifoldHalfFace(manifold_cell_src, face_spec_src),
+      ManifoldHalfFace(manifold_cell_tgt, face_spec_tgt),
+    )
+    
+    # insert in both directions
+    self.X[cp.half_face_src.manifold_cell][cp.half_face_src.face_spec] = cp
+    self.X[cp.inv.half_face_src.manifold_cell][cp.inv.half_face_src.face_spec] = cp.inv
+
+  def get_cell_pairings(self, manifold_cell: ManifoldCell) -> dict[FaceSpec, ManifoldFacePairing]:
+    return self.X.get(manifold_cell)
+
 # TODO: be more specific with the type here
 FingerPattern = list[int]
 
@@ -273,8 +305,9 @@ def get_embedding_tgt(
       tuple(embedding_spec_tgt)
     )
   
-CHOICE = 0
-INDUCED = 1
+INIT = 0
+CHOICE = 1
+INDUCED = 2
 
 def stack_to_str(stack):
   s = ''
@@ -284,6 +317,8 @@ def stack_to_str(stack):
       s += 'C'
     elif tp == INDUCED:
       s += 'I'
+    elif tp == INIT:
+      s += 'X'
     if em.is_tet_tri():
       s += f", Tri({em.cusp_cell.cell_index}), Tet({em.manifold_cell.cell_index}), {em.embedding_spec}], "
     elif em.is_oct_sqr():
@@ -310,6 +345,9 @@ class Construction():
     face_spec = manifold_half_face.face_spec
     
     ems = self.embeddings.get_embeddings_by_manifold_cell(manifold_cell)
+
+    if not ems:
+      return None
 
     for cusp_cell, embedding_src in ems.items():
       edge_spec = embedding_src.exposed(face_spec)
@@ -416,14 +454,43 @@ class Construction():
     if not possible_embeddings:
       return None
     
-    embedding_values = list(possible_embeddings.values())
-
+    embedding_values = list(e for e in possible_embeddings.values() if e is not None)
+    if len(embedding_values) == 0:
+      return None
+    
     if len(set(embedding_values)) != 1:
       raise ValueError('distinct induced embeddings')
     
     return embedding_values[0]
   
-  
+  def build_manifold_cellulation(self) -> ManifoldFacePairing:
+    # right now this is redundant and adds cell twice for each pair
+    # however it builds the correct object
+    mc = ManifoldCellulation()
+    for i in range(self.num_tets):
+      mc.add_cell(Tet(i))
+
+    for i in range(self.num_octs):
+      mc.add_cell(Oct(i))
+
+    for i in range(self.num_tets):
+      for face_spec in TET_FACES:
+        fp = self.find_face_pairing(ManifoldHalfFace(Tet(i), face_spec))
+        if fp is not None:
+          mc.pair(
+            fp.half_face_src.manifold_cell, fp.half_face_src.face_spec,
+            fp.half_face_tgt.manifold_cell, fp.half_face_tgt.face_spec,
+          )
+    for i in range(self.num_octs):
+      for face_spec in OCT_FACES:
+        fp = self.find_face_pairing(ManifoldHalfFace(Oct(i), face_spec))
+        if fp is not None:
+          mc.pair(
+            fp.half_face_src.manifold_cell, fp.half_face_src.face_spec,
+            fp.half_face_tgt.manifold_cell, fp.half_face_tgt.face_spec,
+          )
+    return mc
+
   def is_complete(self):
     return (self.get_least_available_cusp_cell_idx() is None)
   
@@ -484,7 +551,12 @@ class Construction():
     else:
       vert_idx, perm_idx = em.get_indices()
       manifold_cell_idx = em.manifold_cell.cell_index
-      if perm_idx < (num_perms - 1):
+      
+      if vert_idx == 0:
+        # this is a hacky way to skip to the next cell if it is the first embedding
+        # of the cell, make this more elegant
+        vert_idx = num_verts
+      elif perm_idx < (num_perms - 1):
         perm_idx += 1
         return Emb.from_indices(manifold_cell_idx, cusp_cell_idx, vert_idx, perm_idx)
       perm_idx = 0
@@ -547,8 +619,11 @@ class Construction():
     s = stack_to_str(self.stack)
     s += f" ! {self.exc_state}"
     return s
+  
+  def __iter__(self):
+    return self
 
-  def next(self):
+  def __next__(self):
     if not self.stack:
       self.init_stack()
       return
@@ -558,6 +633,7 @@ class Construction():
       tr_idx = self.get_least_available_cusp_cell_idx()
       if tr_idx is None:
         self.completed_stacks.append(self.stack[:])
+        self.mc = self.build_manifold_cellulation()
         raise ValueError('complete')
       cusp_cell = self.traversal[tr_idx]
     except ValueError as e:
@@ -569,11 +645,103 @@ class Construction():
     while True:
       chosen_embedding = self.choose(cusp_cell)
       if chosen_embedding is None:
+        if not self.stack:
+          raise StopIteration
         self.rewind()
         em, tp = self.peek_embedding()
+        if tp == INIT:
+          raise StopIteration
         cusp_cell = em.cusp_cell
       else:
         break
     
+  # def choose2(self, embedding: TetTriEmbedding| OctSqrEmbedding):
+  #   cusp_cell = embedding.cusp_cell
+  #   manifold_cell = embedding.manifold_cell
+
+  #   cusp_cell_idx = cusp_cell.cell_index
+  #   manifold_cell_idx = manifold_cell.cell_index
+
+  #   vert_idx, perm_idx = embedding.get_indices()
+
+  #   if cusp_cell.is_tri():
+  #     MCell = Tet
+  #     Emb = TetTriEmbedding
+  #     num_manifold_cells = self.num_tets
+  #     num_verts = 4
+  #     num_perms = 6
+
+  #   elif cusp_cell.is_sqr():
+  #     MCell = Oct
+  #     Emb = OctSqrEmbedding
+  #     num_manifold_cells = self.num_octs
+  #     num_verts = 6
+  #     num_perms = 8
+
+  #   if perm_idx < (num_perms - 1):
+  #     perm_idx += 1
+  #     return Emb.from_indices(manifold_cell_idx, cusp_cell_idx, vert_idx, perm_idx)
+    
+  #   perm_idx = 0
+
+  #   while True:
+  #     if vert_idx < (num_verts - 1):
+  #       vert_idx += 1
+  #       if not self.embeddings.is_vert_embedded(MCell(manifold_cell_idx), vert_idx):
+  #         return Emb.from_indices(manifold_cell_idx, cusp_cell_idx, vert_idx, perm_idx)
+  #     else:
+  #       vert_idx = 0
+  #       if manifold_cell_idx < (num_manifold_cells - 1):
+  #         manifold_cell_idx += 1
+  #         if not self.embeddings.is_vert_embedded(MCell(manifold_cell_idx), vert_idx):
+  #           return Emb.from_indices(manifold_cell_idx, cusp_cell_idx, vert_idx, perm_idx)
+  #       else:
+  #         return None
 
 
+  # def next2(self):
+  #   # need to add initialization
+
+
+  #   em, tp = self.peek_embedding()
+
+  #   if self.state == 'REWIND':
+  #     if tp == INDUCED:
+  #       self.pop_embedding()
+  #       next_state = 'REWIND'
+  #     else:
+  #       next_state = 'CHOOSE'
+    
+  #   elif self.state == 'CHOOSE':
+  #     # choose logic
+  #     next_em = self.next_embedding(em)
+  #     self.pop_embedding()
+  #     if next_em is None:
+  #       next_state = 'CHOOSE'
+  #     else:
+  #       self.push_embedding(next_em)
+  #       next_state = 'INDUCE'
+    
+  #   elif self.state == 'INDUCE':
+  #     try:
+  #       next_em = self.induce_one()
+  #     except ValueError as e:
+  #       next_state = 'REWIND'
+      
+  #     if next_em is None:
+  #       next_state = 'CHOOSE'
+  #     else:
+  #       next_state = 'INDUCE'
+  #       self.push_embedding(next_em)
+
+
+        
+
+      
+
+
+
+    # if self.state == 'INDUCE':
+    #   induced_embedding = self.induce_one()
+    #   if induced_embedding is None:
+    #     self.state = 'CHOOSE'

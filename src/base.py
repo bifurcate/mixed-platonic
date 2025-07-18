@@ -89,6 +89,23 @@ OCT_VERT_PERMS = [ (i,j) for i in range(6) for j in range(8) ]
 OCT_PERM_LU = dict(zip(OCT_VERT_PERMS, OCT_PERMS))
 OCT_PERM_RV_LU = dict(zip(OCT_PERMS, OCT_VERT_PERMS))
 
+TET_FACES = [
+  (0,1,2),
+  (0,1,3),
+  (0,2,3),
+  (1,2,3),
+]
+
+OCT_FACES = [
+  (0,1,2),
+  (0,1,4),
+  (0,2,3),
+  (0,3,4),
+  (1,2,5),
+  (1,4,5),
+  (2,3,5),
+  (3,4,5),
+]
 
 TRI_EDGES = [
   (1,2),

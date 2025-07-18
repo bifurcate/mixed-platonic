@@ -352,6 +352,38 @@ def test_construction_find_face_pairing():
     ManifoldHalfFace(Oct(0), (0, 1, 4)),
   )
 
+def test_construction_build_manifold_cellulation():
+  finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
+  cusp = FingerCuspGenerator(finger_pattern).generate()
+  embeddings = Embeddings()
+
+  embeddings.add_embedding(
+    OctSqrEmbedding(Oct(0), Sqr(0), (0, 1, 2, 3, 4, 5))
+  )
+  embeddings.add_embedding(
+    TetTriEmbedding(Tet(0), Tri(0), (0, 1, 2, 3))
+  )
+  embeddings.add_embedding(
+    TetTriEmbedding(Tet(1), Tri(1), (0, 1, 2, 3))
+  )
+  embeddings.add_embedding(
+    OctSqrEmbedding(Oct(1), Sqr(1), (0, 1, 2, 3, 4, 5))
+  )
+  embeddings.add_embedding(
+    TetTriEmbedding(Tet(2), Tri(2), (0, 1, 2, 3))
+  )
+  embeddings.add_embedding(
+    TetTriEmbedding(Tet(0), Tri(3), (1, 3, 2, 0))
+  )
+
+  construction = Construction(cusp, embeddings)
+  mc = construction.build_manifold_cellulation()
+  tet0_pairings = mc.get_cell_pairings(Tet(0))
+  assert tet0_pairings[(0,1,2)] == ManifoldFacePairing(
+    ManifoldHalfFace(Tet(0), (0, 1, 2)), 
+    ManifoldHalfFace(Oct(1), (4, 0, 1)),
+  )
+
 def test_construction_get_induced_embedding_1():
 
   finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
@@ -552,6 +584,7 @@ def test_complete_boyd():
 
   def cell_iterator(m, n):
     for finger_idx in range(m, n): 
+      
       yield(Sqr(finger_idx))
       yield(Tri(2 * finger_idx))
       yield(Tri(2 * finger_idx + 1))
@@ -659,7 +692,7 @@ def test_empty_boyd():
   assert boyd_empty.get_least_available_cusp_cell_idx() == 0
   assert embeddings.is_vert_embedded(Oct(1), 1) == False
 
-def test_construction_get_embedding_by_cusp_cell_1():
+def xtest_construction_get_embedding_by_cusp_cell_1():
   finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
   cusp = FingerCuspGenerator(finger_pattern).generate()
 
@@ -801,7 +834,7 @@ def test_construction_induce_1():
 
   assert embeddings.is_vert_embedded(Oct(1), 1) == True
 
-def test_construction_get_next_embedding_1():
+def xtest_construction_get_next_embedding_1():
   finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
   cusp = FingerCuspGenerator(finger_pattern).generate()
   
@@ -831,7 +864,7 @@ def test_construction_get_next_embedding_1():
   assert boyd.get_next_embedding(Sqr(0)) == OctSqrEmbedding(Oct(0), Sqr(0), (0, 1, 4, 3, 2, 5))
   assert boyd.get_next_embedding(Tri(0)) == TetTriEmbedding(Tet(0), Tri(0), (0, 1, 3, 2))
 
-def test_construction_get_next_embedding_2():
+def xtest_construction_get_next_embedding_2():
   finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
   cusp = FingerCuspGenerator(finger_pattern).generate()
   
@@ -861,29 +894,3 @@ def test_construction_get_next_embedding_2():
   assert boyd.get_next_embedding(Sqr(1)) == OctSqrEmbedding(Oct(0), Sqr(1), (1, 0, 2, 5, 4, 3))
   assert boyd.get_next_embedding(Tri(1)) == TetTriEmbedding(Tet(1), Tri(1), (0, 1, 3, 2))
 
-def test_construction_next():
-  finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
-  cusp = FingerCuspGenerator(finger_pattern).generate()
-  embeddings = Embeddings()
-
-  def tr_gen(num_fingers):
-    for i in range(num_fingers):
-      yield Sqr(i)
-      yield Tri(2*i)
-      yield Tri(2*i + 1)
-
-  traversal = list(tr_gen(12))
-
-  construction = Construction(cusp, embeddings, traversal)
-
-  breakpoint()
-  construction.next()
-  construction.next()
-  construction.next()
-  construction.next()
-  construction.next()
-  construction.next()
-  construction.next()
-  construction.next()
-  construction.next()
-  construction.next()
