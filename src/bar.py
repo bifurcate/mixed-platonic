@@ -14,6 +14,8 @@ from construction import (
   stack_to_str,
 )
 
+from draw import draw_stack
+
 from itertools import combinations, product
 
 def generate_iterates(num_tets, num_tris, num_octs, num_sqrs):
@@ -32,18 +34,19 @@ def create_input_stack(tet_indices, oct_indices):
 
   return input_stack
 
-def do_iterate(construction, tet_indices, oct_indices):
-  input_stack = create_input_stack(tet_indices, oct_indices)
-  construction.load_stack(input_stack)
-  for i,_ in enumerate(construction):
-    pass
+# def do_iterate(construction, tet_indices, oct_indices):
+#   input_stack = create_input_stack(tet_indices, oct_indices)
+#   construction.load_stack(input_stack)
+#   draw_stack
+#   for i,_ in enumerate(construction):
+#     pass
 
-  print(f"num iterations: {i}")
-  print(f"num completed: {len(construction.completed_stacks)}")
-  for c_stack in construction.completed_stacks:
-    print(stack_to_str(c_stack))
+#   print(f"num iterations: {i}")
+#   print(f"num completed: {len(construction.completed_stacks)}")
+#   for c_stack in construction.completed_stacks:
+#     print(stack_to_str(c_stack))
 
-  return construction.completed_stacks
+#   return construction.completed_stacks
 
 
 if __name__ == '__main__':
@@ -51,15 +54,30 @@ if __name__ == '__main__':
   cusp_generator = FingerCuspGenerator(finger_pattern)
   cusp = cusp_generator.generate()
   traversal = list(cusp_generator.traversal())
-  init_tri_indices = (0,1,2,4,5,6)
+  init_tet_indices = (
+    0,1,2,4,5,6
+  )
   init_oct_indices = (0,1)
 
   embeddings = Embeddings()
   construction = Construction(cusp, embeddings, traversal, num_tets = 6, num_octs = 2)
 
-  completed_stacks = do_iterate(construction, init_tri_indices, init_oct_indices)
-  # breakpoint()
-  print(f"completed_stacks ({len(completed_stacks)})")
-  for c_stack in construction.completed_stacks:
-    print(stack_to_str(c_stack))
+
+  input_stack = create_input_stack(init_tet_indices, init_oct_indices)
+  construction.load_stack(input_stack)
+  # draw_stack(finger_pattern, construction, "test.svg")
+
+
+  for i,_ in enumerate(construction):
+    # draw_stack(finger_pattern, construction, f"draw_test/{i}.svg")
+    breakpoint()
+
+    pass
+
+  # print(f"num iterations: {i}")
+  # print(f"num completed: {len(construction.completed_stacks)}")
+  # for c_stack in construction.completed_stacks:
+  #   print(stack_to_str(c_stack))
+
+  # return construction.completed_stacks
 

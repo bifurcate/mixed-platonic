@@ -129,6 +129,11 @@ CUSP_CELL_TYPE_LABEL = {
   TRI: 'Triangle',
 }
 
+CUSP_CELL_TYPE_SHORT_LABEL = {
+  TRI: 'tri',
+  SQR: 'sqr',
+}
+
 CuspCellType = Optional[int]
 CuspCellIndex = int
 
@@ -156,6 +161,10 @@ class CuspCell:
   
   def is_tri(self):
     return self.cell_type == TRI
+  
+  def short_str(self):
+    return f"{CUSP_CELL_TYPE_SHORT_LABEL[self.cell_type]}[{self.cell_index:2}]"
+    
 
 class Triangle(CuspCell):
   cell_type: CuspCellType = TRI
@@ -173,6 +182,15 @@ class Square(CuspCell):
 
 Sqr = Square
 
+CUSP_CELL_CLASS = {
+  None: CuspCell,
+  SQR: Square,
+  TRI: Triangle,
+}
+
+def cusp_cell_from_tuple(cell_tuple):
+  return CUSP_CELL_CLASS[cell_tuple[0]](cell_tuple[1])
+
 TET = 0
 OCT = 1
 
@@ -180,6 +198,11 @@ MANIFOLD_CELL_TYPE_LABEL = {
   None: 'ManifoldCell',
   TET: 'Tetrahedron',
   OCT: 'Octahedron',
+}
+
+MANIFOLD_CELL_TYPE_SHORT_LABEL = {
+  TET: 'tet',
+  OCT: 'oct',
 }
 
 ManifoldCellType = Optional[int]
@@ -209,6 +232,9 @@ class ManifoldCell:
   
   def is_oct(self):
     return self.cell_type == OCT
+  
+  def short_str(self):
+    return f"{MANIFOLD_CELL_TYPE_SHORT_LABEL[self.cell_type]}[{self.cell_index}]"
 
 class Tetrahedron(ManifoldCell):
   cell_type: ManifoldCellType = TET
@@ -245,6 +271,12 @@ class CuspHalfEdge:
 
   def __eq__(self, other):
     return tuple(self) == tuple(other)
+  
+def cusp_half_edge_from_tuple(half_edge_tuple):
+  return CuspHalfEdge(
+    cusp_cell_from_tuple(half_edge_tuple[0]),
+    half_edge_tuple[1],
+  )
   
 FaceSpec = tuple[int, int, int]
 
@@ -317,6 +349,13 @@ class CuspEdgePairing:
     )
 
     return CuspEdgePairing(inv_half_edge_src, inv_half_edge_tgt)
+  
+def cusp_edge_pairing_from_tuple(cusp_edge_pairing_tuple):
+  return CuspEdgePairing(
+    cusp_half_edge_from_tuple(cusp_edge_pairing_tuple[0]),
+    cusp_half_edge_from_tuple(cusp_edge_pairing_tuple[1]),
+  )
+
 
 def normalize_face_pair(face_spec_src: FaceSpec, face_spec_tgt: FaceSpec):
   sort_indices = [i for i, _ in sorted(enumerate(face_spec_src), key=lambda x: x[1])]
@@ -421,6 +460,14 @@ class Embedding:
   def is_oct_sqr(self):
     return self.embedding_type == OCT_SQR
   
+  def get_iterator_indices(self):
+    vert_idx, perm_idx = self.get_indices()
+    return self.manifold_cell.cell_index, vert_idx, perm_idx
+  
+  def short_str(self):
+    em_spec_str = ''.join(str(i) for i in self.embedding_spec)
+    return f"{self.manifold_cell.short_str()}, {self.cusp_cell.short_str()}, {em_spec_str}"
+  
   @cached_property
   def map(self):
     return dict(zip(
@@ -514,6 +561,7 @@ class OctSqrEmbedding(Embedding):
   def get_indices(self):
     return OCT_PERM_RV_LU.get(self.embedding_spec)
   
+
   @classmethod
   def from_indices(cls, manifold_cell_idx, cusp_cell_idx, vert_idx, perm_idx):
     embedding_spec = OCT_PERM_LU.get((vert_idx, perm_idx))

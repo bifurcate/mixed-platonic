@@ -1,18 +1,14 @@
 from base import (
-  SQR,
-  TRI,
+  EmbeddingType,
+  Embedding,
+  CuspCellIndex,
+  ManifoldCellType,
   TET_TRI,
   OCT_SQR,
-  TET_PERMS,
-  OCT_PERMS,
-  Tri, 
-  Sqr,
-  Tet,
-  Oct,
-  Embedding,
+  Tetrahedron,
+  Octahedron,
   TetTriEmbedding,
   OctSqrEmbedding,
-  CuspCell,
 )
 
 from construction import (
@@ -22,442 +18,336 @@ from construction import (
   Construction,
 )
 
-FIRST = 0
-CHOICE = 1
+from export_regina import (
+  to_regina_triangulation
+)
+
+from draw import (
+  draw_stack
+)
+
+class EmbeddingIterator:
+  embedding_type: EmbeddingType = None
+  manifold_cell_class = None
+  num_verts = 0
+  num_perms = 0
+
+  def __init__(self, embeddings: Embeddings, num_manifold_cells: int):
+    self.embeddings = embeddings
+    self.num_manifold_cells = num_manifold_cells
+    self.done = False
+    self.cell_idx = 0
+    self.vert_idx = 0
+    self.perm_idx = 0
+
+  def set(self, cell_idx, vert_idx, perm_idx):
+    self.done = False
+    self.cell_idx = cell_idx
+    self.vert_idx = vert_idx
+    self.perm_idx = perm_idx
+
+    if self.is_current_vert_embedded():
+      self.next()
+
+  def reset(self):
+    self.set(0, 0, 0)
+
+  def is_current_vert_embedded(self):
+    return self.embeddings.is_vert_embedded(
+      self.manifold_cell_class(self.cell_idx),
+      self.vert_idx,
+    )
+
+  def weak_next(self):
+    if self.perm_idx < self.num_perms - 1:
+      self.perm_idx += 1
+      return self
+    
+    self.perm_idx = 0
+    if self.vert_idx < self.num_verts - 1:
+      self.vert_idx += 1
+      return self
+    
+    self.vert_idx = 0
+    if self.cell_idx < self.num_manifold_cells - 1:
+      self.cell_idx += 1
+      return self
+
+    self.cell_idx = 0
+    self.done = True
+    return None
+  
+  def next(self):
+    while True:
+      self.weak_next()
+      if not self.is_current_vert_embedded() or self.done:
+        return self
+
+class TetTriEmbeddingIterator(EmbeddingIterator):
+  embedding_type: EmbeddingType = TET_TRI
+  manifold_cell_class = Tetrahedron
+  num_verts = 4
+  num_perms = 6
+
+  def __init__(self, embeddings: Embeddings, num_manifold_cells: int):
+    super().__init__(embeddings, num_manifold_cells)
+
+class OctSqrEmbeddingIterator(EmbeddingIterator):
+  embedding_type: EmbeddingType = OCT_SQR
+  manifold_cell_class = Octahedron
+  num_verts = 6
+  num_perms = 8
+
+  def __init__(self, embeddings: Embeddings, num_manifold_cells: int):
+    super().__init__(embeddings, num_manifold_cells)
+
+
+INIT = 0
+REGULAR = 1
 INDUCED = 2
 
+ENTRY_TYPE_SHORT_LABELS = {
+  INIT: 'O',
+  REGULAR: 'R',
+  INDUCED: 'I',
+}
 
-# TET_VERT_PERMS = [ (i,j) for i in range(4) for j in range(6) ]
-# TET_PERM_LU = dict(zip(TET_VERT_PERMS, TET_PERMS))
-# TET_PERM_RV_LU = dict(zip(TET_PERMS, TET_VERT_PERMS))
+EntryType = int
 
-# OCT_VERT_PERMS = [ (i,j) for i in range(6) for j in range(8) ]
-# OCT_PERM_LU = dict(zip(OCT_VERT_PERMS, OCT_PERMS))
-# OCT_PERM_RV_LU = dict(zip(OCT_PERMS, OCT_VERT_PERMS))
+class Stack:
+  def __init__(self, traversal, construction: Construction, num_tets, num_octs):
+    self.stack = []
+    self.construction = construction
+    self.traversal = traversal
+    self.tr_idx = None
+    self.cusp_cell = None
+    self.embedding = None
+    self.entry_type = None
+    self.num_tets = num_tets
+    self.num_octs = num_octs
+    self.tet_tri_embedding_iterator = TetTriEmbeddingIterator(
+      self.construction.embeddings,
+      self.num_tets,
+    )
+    self.oct_sqr_embedding_iterator = OctSqrEmbeddingIterator(
+      self.construction.embeddings,
+      self.num_octs,
+    )
+    self.done = False
+    self.counter = 0
+    self.completed = []
+    self.iso_sigs = []
 
-# def to_embedding(
-#   embedding_type,
-#   cusp_cell_idx,
-#   manifold_cell_idx,
-#   vert_idx,
-#   perm_idx,
-# ):
-#   if embedding_type == TET_TRI:
-#     embedding_spec = TET_PERM_LU.get((vert_idx, perm_idx))
-#   elif embedding_type == OCT_SQR:
-#     embedding_spec = OCT_PERM_LU.get((vert_idx, perm_idx))
-#   else:
-#     raise ValueError('embedding_type must be TET_TRI or OCT_SQR')
-  
-#   if embedding_spec is None:
-#     return None
-  
-#   if embedding_type == TET_TRI:
-#     return TetTriEmbedding(Tet(manifold_cell_idx), Tri(cusp_cell_idx), embedding_spec)
-#   elif embedding_type == OCT_SQR:
-#     return OctSqrEmbedding(Oct(manifold_cell_idx), Sqr(cusp_cell_idx), embedding_spec)
-  
-# def from_embedding(embedding: Embedding):
-#   if embedding.embedding_type == TET_TRI:
-#     vert_idx, perm_idx = TET_PERM_RV_LU.get(embedding.embedding_spec)
-#     return (TET_TRI, embedding.cusp_cell.cell_index, embedding.manifold_cell.cell_index, vert_idx, perm_idx)
-#   elif embedding.embedding_type == OCT_SQR:
-#     vert_idx, perm_idx = OCT_PERM_RV_LU.get(embedding.embedding_spec)
-#     return (OCT_SQR, embedding.cusp_cell.cell_index, embedding.manifold_cell.cell_index, vert_idx, perm_idx)
+  def get_next_embedding(self):
+    if self.cusp_cell.is_tri():
+      embedding_class = TetTriEmbedding
+      embedding_iterator = self.tet_tri_embedding_iterator
+    else:
+      embedding_class = OctSqrEmbedding
+      embedding_iterator = self.oct_sqr_embedding_iterator
 
+    if self.embedding is None:
+      embedding_iterator.reset()
+    else:
+      cell_idx, vert_idx, perm_idx = self.embedding.get_iterator_indices()
+      embedding_iterator.set(cell_idx, vert_idx, perm_idx)
+      embedding_iterator.next()
 
-# def to_cusp_cell(
-#   cusp_cell_type,
-#   cusp_cell_idx,
-# ):
-#   if cusp_cell_type == TRI:
-#     return Tri(cusp_cell_idx)
-#   elif cusp_cell_type == SQR:
-#     return Sqr(cusp_cell_idx)
-  
-# def from_cusp_cell(cusp_cell: CuspCell):
-#   return tuple(cusp_cell)
-
-# EntryType = int
-
-# class TetTriIter:
-#   def __init__(self, table, n):
-#     self.table = table
-#     self.n = n
-  
-#   def __iter__(self):
-#     for i in range(self.n):
-#       for j in range(4):
-#         for k in range(6):
-#           if (i,j,k) in self.table:
-#             continue
-#           else:
-#             yield (i,j,k)
-
-# def tt_iter(n, tris = []):
-#   manifold_cell_idx = 0
-#   perm_idx = 0
-#   vert_idx = 0
-#   while True:
-#     yield (manifold_cell_idx, vert_idx, perm_idx)
-#     if perm_idx < 6:
-#       perm_idx += 1
-#     else:
-#       perm_idx = 0
-#       if vert_idx < 4:
-#         vert_idx += 1
-#       else:
-#         vert_idx = 0
-#         if manifold_cell_idx < n:
-#           manifold_cell_idx += 1
-#         else:
-#           return
-        
-# def next_factory(num_verts, num_perms):
-#   def next_func(n, idx, verts):
-#     if idx is not None:
-#       manifold_cell_idx, vert_idx, perm_idx = idx
-#       if perm_idx < (num_perms - 1):
-#         perm_idx += 1
-#         return (manifold_cell_idx, vert_idx, perm_idx)
-#       perm_idx = 0
-#     else:
-#       manifold_cell_idx = 0
-#       vert_idx = 0
-#       perm_idx = 0
-#       if (manifold_cell_idx, vert_idx) not in verts:
-#           return (manifold_cell_idx, vert_idx, perm_idx)
-#     while True:
-#       if vert_idx < (num_verts - 1):
-#         vert_idx += 1
-#         if (manifold_cell_idx, vert_idx) not in verts:
-#           return (manifold_cell_idx, vert_idx, perm_idx)
-#       else:
-#         vert_idx = 0
-#         if manifold_cell_idx < (n - 1):
-#           manifold_cell_idx += 1
-#           if (manifold_cell_idx, vert_idx) not in verts:
-#             return (manifold_cell_idx, vert_idx, perm_idx)
-#         else:
-#           return None
-#   return next_func
-
-
-# def traversal(num_fingers):
-#   for i in range(num_fingers):
-#     yield (SQR, i)
-#     yield (TRI, 2*i)
-#     yield (TRI, 2*i + 1)
-
-
-# tt_next = next_factory(4, 6)
-# os_next = next_factory(6, 8)
-
-# def next_1(
-#     num_tets,
-#     num_octs,
-#     trvsl,
-#     stack,
-#     cusp_cell_map,
-#     tet_verts,
-#     oct_verts
-# ):
-#   if not stack:
-#     tr_idx = 0
-#   else:
-#     tr_idx, _ = stack.pop()
-  
-#   entry = cusp_cell_map.get(tr_idx)
-#   tr_cusp_cell_type, _ = trvsl[tr_idx]
-
-#   if entry == None:
-#     if tr_cusp_cell_type == TET_TRI:
-#       manifold_cell_idx, vert_idx, perm_idx = os_next(num_tets, None, tet_verts)
-#       tet_verts.append((manifold_cell_idx, vert_idx))
-
-#     elif tr_cusp_cell_type == OCT_SQR:
-#       manifold_cell_idx, vert_idx, perm_idx = os_next(num_octs, None, oct_verts)
-#       oct_verts.append((manifold_cell_idx, vert_idx))
-#     else:
-#       raise ValueError('cusp cell type must be TRI or SQR')
+    if embedding_iterator.vert_idx == 0:
+      init = True
+    else:
+      init = False
     
-#     cusp_cell_map[tr_idx] = (manifold_cell_idx, vert_idx, perm_idx)
-#     stack.append((tr_idx, FIRST))
-#   else:
-#     manifold_cell_idx, vert_idx, perm_idx = entry
-#     if tr_cusp_cell_type == TET_TRI:
-#       tet_verts.remove((manifold_cell_idx, vert_idx))
-#       manifold_cell_idx, vert_idx, perm_idx = os_next(num_tets, entry, tet_verts)
-#       tet_verts.append((manifold_cell_idx, vert_idx))
+    if embedding_iterator.done:
+      return (init, None) 
+    else:
+      next_embedding = embedding_class.from_indices(
+        embedding_iterator.cell_idx,
+        self.cusp_cell.cell_index,
+        embedding_iterator.vert_idx,
+        embedding_iterator.perm_idx,
+      )
+      return (init, next_embedding)
 
-#     elif tr_cusp_cell_type == OCT_SQR:
-#       oct_verts.remove((manifold_cell_idx, vert_idx))
-#       manifold_cell_idx, vert_idx, perm_idx = os_next(num_octs, entry, oct_verts)
-#       oct_verts.append((manifold_cell_idx, vert_idx))
-#     else:
-#       raise ValueError('cusp cell type must be TRI or SQR')
+  def get_next_induced(self) -> tuple[bool, int, Embedding]:
+    # TODO: make this more efficient, right now we check everything!
+    for i, c in enumerate(self.traversal):
+      existing_embedding = self.construction.embeddings.get_embedding_by_cusp_cell(c)
+
+      try:
+        # TODO: capture more info on violation type
+        proposed_embedding = self.construction.get_induced_embedding_for_cell(c)
+      except:
+        return (False, i, None)
+
+      if proposed_embedding is None:
+        continue
+
+      if existing_embedding is None:
+        m_cell = proposed_embedding.manifold_cell
+        vert_idx = proposed_embedding.embedding_spec[0]
+        if self.construction.embeddings.is_vert_embedded(m_cell, vert_idx):
+          # Vert already embedded!
+          return (False, i, proposed_embedding)
+        else:
+          return (True, i, proposed_embedding)
+          
+      else:
+        if existing_embedding != proposed_embedding:
+          # Embedding inconsistency!
+          return (False, i, proposed_embedding)
+    return (True, i, None)
+  def get_least_available_cusp_cell_idx(self):
+    for idx, cusp_cell in enumerate(self.traversal):
+      em = self.construction.embeddings.get_embedding_by_cusp_cell(cusp_cell)
+      if em is None:
+        return idx
+    return None
+  
+  def load(self, input_stack: list[tuple[int, Embedding]]):
+    for tp, em in input_stack:
+      self.cusp_cell = em.cusp_cell
+      self.embedding = em
+      self.tr_idx = self.traversal.index(em.cusp_cell)
+      self.entry_type = tp
+      self.push_state()
+
+  def save(self):
+    output_stack = []
+    for tr_idx, tp in self.stack:
+      cusp_cell = self.traversal[tr_idx]
+      em = self.construction.embeddings.get_embedding_by_cusp_cell(cusp_cell)
+      output_stack.append((tp, em))
+    return output_stack
+
+  def pop_state(self):
+    self.tr_idx, self.entry_type = self.stack.pop()
+    self.cusp_cell = self.traversal[self.tr_idx]
+    self.embedding = self.construction.embeddings.get_embedding_by_cusp_cell(self.cusp_cell)
+    self.construction.embeddings.remove_embedding(self.embedding)
+
+  def push_state(self):
+    self.construction.embeddings.add_embedding(self.embedding)
+    self.stack.append((self.tr_idx, self.entry_type))
+
+  def rewind(self):
+    while True:
+      self.pop_state()
+      if self.entry_type == REGULAR:
+        break
+
+  def next_open_cell(self):
+    self.tr_idx = self.get_least_available_cusp_cell_idx()
+    self.cusp_cell = self.traversal[self.tr_idx]
+    self.embedding = None
+    self.entry_type = REGULAR
+
+  def next_embedding(self):
+    embedding = self.get_next_embedding()
+
+    if embedding is None:
+      self.rewind()
+      return
     
-#     cusp_cell_map[tr_idx] = (manifold_cell_idx, vert_idx, perm_idx)
-#     stack.append((tr_idx, CHOICE))
+    self.embedding = embedding
+    self.entry_type = REGULAR
+    self.push_state()
 
-# # class Stack:
-# #   def __init__(self, construction):
-# #     self.construction = construction
-# #     self.X = []
+  def induce(self):
+    while True:
+      ok, tr_idx, next_embedding = self.get_next_induced()
+      if not ok:
+        self.rewind()
+        break
 
-# #   def add_embedding(self, embedding: Embedding, entry_type: EntryType):
-# #     self.X.append((embedding, entry_type))
+      if next_embedding is not None:
+        self.tr_idx = tr_idx
+        self.embedding = next_embedding
+        self.entry_type = INDUCED
+        self.push_state()
+      else:
+        self.next_open_cell()
 
-# #   def rewind(self):
-# #     embedding, entry_type = self.X.pop()
-# #     while entry_type != INDUCED:
-# #       embedding, entry_type = self.X.pop()
-# #     self.X.append((embedding, entry_type))
-
-# #   def induce(self):
-# #     ...
-
-
-# # [TET_TRI, TRI_IDX, TET_IDX, VERT_IDX, PERM_IDX]
-# # [OCT_SQR, SQR_IDX, OCT_IDX, VERT_IDX, PERM_IDX]
-
-
-
-
-# class Stack:
-#   def __init__(self, num_tri, num_sqr, num_tet, num_oct):
-#     self.num_tri = num_tri
-#     self.num_sqr = num_sqr
-#     self.num_tet = num_tet
-#     self.num_oct = num_oct
-#     self.tris = []
-#     self.sqrs = []
-
-
-
-# # class Stack:
-# #   def __init__(self, num_tri, num_sqr, num_tet, num_tri):
-# #     self.num_tri = num_tri
-# #     self.num_sqr = num_sqr
-# #     self.num_tet = num_tet
-# #     self.stack = []
-
-# #   def next(self):
-# #     e = self.stack.pop()
-# #     tp, cusp_cell_idx, manifold_cell_idx, vert_idx, perm_idx = e
-
-#     # if tp == TET_TRI:
-#     #   if perm_idx < 6:
-#     #     perm_idx += 1
-#     #   else:
-#     #     perm_idx = 0
-#     #     if vert_idx < 4:
-#     #       vert_idx += 1
-#     #     else:
-#     #       vert_idx = 0
-#     #       if manifold_cell_idx < self.num_tet:
-#     #         manifold_cell_idx += 1
-#     #       else:
-#     #         ## DONE
-#     #         ...
-#     # elif tp == OCT_SQR:
-#     #         if perm_idx < 6:
-#     #     perm_idx += 1
-#     #   else:
-#     #     perm_idx = 0
-#     #     if vert_idx < 4:
-#     #       vert_idx += 1
-#     #     else:
-#     #       vert_idx = 0
-#     #       if manifold_cell_idx < self.num_tet:
-#     #         manifold_cell_idx += 1
-#     #       else:
-#     #         ## DONE
-#     #         ...
-
-def foo():
-
-  # finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
-  # cusp = FingerCuspGenerator(finger_pattern).generate()
-  # embeddings = Embeddings()
-
-  # def tr_gen(num_fingers):
-  #   for i in range(num_fingers):
-  #     yield Sqr(i)
-  #     yield Tri(2*i)
-  #     yield Tri(2*i + 1)
-
-  # traversal = list(tr_gen(12))
-
-  # construction = Construction(cusp, embeddings, traversal)
-
-  # tr_idx = construction.get_least_available_cusp_cell_idx()
-
-  # stack = []
-
-  # while tr_idx is not None:
-
-  #   try:
-  #     while True:
-  #       induced_embedding = construction.induce()
-  #       if induced_embedding is None:
-  #         break
-  #       stack.append((induced_embedding, INDUCED))
-  #       yield stack
-  #   except ValueError:
-  #     # rollback induced
-  #     while True:
-  #       em, tp = stack.pop()
-  #       if tp != INDUCED:
-  #         stack.append((em, tp))
-  #         break
-  #       else:
-  #         yield stack
-  #         embeddings.remove_embedding(em)
-        
+  # def next(self):
   #   while True:
-  #     tr_idx = construction.get_least_available_cusp_cell_idx()
-  #     cusp_cell = traversal[tr_idx]
-  #     chosen_embedding = construction.choose(cusp_cell)
-      
-  #     if chosen_embedding is None:
-  #       # pop choice and rollback induced
-  #       em, tp = stack.pop()
-  #       if tp != CHOICE:
-  #         raise ValueError('inconsistent stack')
-  #       embeddings.remove_embedding(em)
-  #       while True:
-  #         em, tp = stack.pop()
-  #         if tp != INDUCED:
-  #           stack.append((em, tp))
-  #           break
-  #         else:
-  #           yield stack
-  #           embeddings.remove_embedding(em)
-  #     else:
-  #       yield stack
-  #       stack.append(chosen_embedding, CHOICE)
-  #       break
+  #     ok = self.next_embedding()
+  #     if ok:
+  #       self.induce()
 
-
-  # CHOICE = 0
-  # INDUCED = 1
-
-  # finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
-  # cusp = FingerCuspGenerator(finger_pattern).generate()
-  # embeddings = Embeddings()
-
-  # def tr_gen(num_fingers):
-  #   for i in range(num_fingers):
-  #     yield Sqr(i)
-  #     yield Tri(2*i)
-  #     yield Tri(2*i + 1)
-
-  # traversal = list(tr_gen(12))
-
-  # construction = Construction(cusp, embeddings, traversal)
-
-  # tr_idx = construction.get_least_available_cusp_cell_idx()
-
-  # stack = []
-
-  # breakpoint()
-  # while tr_idx is not None:
-
-  #   try:
-  #     while True:
-  #       induced_embedding = construction.induce()
-  #       if induced_embedding is None:
-  #         tr_idx = construction.get_least_available_cusp_cell_idx()
-  #         cusp_cell = traversal[tr_idx]
-  #         break
-  #       stack.append((induced_embedding, INDUCED))
-  #   except ValueError:
-  #     # rollback induced
-  #     while True:
-  #       em, tp = stack[-1]
-  #       if tp == INDUCED:
-  #         stack.pop()
-  #         embeddings.remove_embedding(em)
-  #       else:
-  #         break
-
-  #   while True:
-  #     chosen_embedding = construction.choose(cusp_cell)
-      
-  #     if chosen_embedding is None:
-  #       # pop choice and rollback induced
-  #       em, tp = stack.pop()
-  #       if tp != CHOICE:
-  #         raise ValueError('inconsistent stack')
-  #       embeddings.remove_embedding(em)
-  #       while True:
-  #         em, tp = stack[-1]
-  #         if tp == INDUCED:
-  #           stack.pop()
-  #           embeddings.remove_embedding(em)
-  #         else:
-  #           break
-  #       em, _ = stack[-1]
-  #       cusp_cell = em.cusp_cell
-  #     else:
-  #       stack.append((chosen_embedding, CHOICE))
-  #       em, _ = stack[-1]
-  #       cusp_cell = em.cusp_cell
-  #       break
-      
-
-
-
-
-  # num_tets = 6
-  # num_octs = 2
-  # stack = []
-  # cusp_cell_map = {}
-  # tet_verts = []
-  # oct_verts = []
-
-  # next_1(num_tets, num_octs, finger_traversal, stack, cusp_cell_map, tet_verts, oct_verts)
-
-  # tr_idx, entry_type = stack[-1]
-  # cusp_cell_type, cusp_cell_idx = finger_traversal[tr_idx]
-  # manifold_cell_idx, vert_idx, perm_idx = cusp_cell_map.get(tr_idx)
-  # new_embedding = to_embedding(
-  #   cusp_cell_type,
-  #   cusp_cell_idx,
-  #   manifold_cell_idx,
-  #   vert_idx,
-  #   perm_idx
-  # )
-  # embeddings.add_embedding(new_embedding)
-
-  # change = True
-  # violation = False
-
-  # while change and not violation:
-  #   for i in finger_traversal:
-  #     cusp_cell_type, cusp_cell_idx = finger_traversal[i]
-  #     cusp_cell = to_cusp_cell(cusp_cell_type, cusp_cell_idx)
-  #     existing_embedding = embeddings.get_embedding_by_cusp_cell(cusp_cell)
-  #     try: 
-  #       proposed_embedding = construction.get_induced_embeddings_for_cell(cusp_cell)
-  #     except ValueError:
-  #       violation = True
-  #       break
-
-  #     if existing_embedding is None:
-  #       embeddings.add_embedding(proposed_embedding)
-
-  # if violation:
-  #   rewind()
-
+  def dump_stack(self):
+    s = ''
+    for stack_entry in reversed(self.stack):
+      tr_idx, tp = stack_entry
+      cusp_cell = self.traversal[tr_idx]
+      em = self.construction.embeddings.get_embedding_by_cusp_cell(cusp_cell)
+      s += f"{tr_idx:3}, {ENTRY_TYPE_SHORT_LABELS[tp]}, {em.short_str()}\n"
+    return s
   
-
-      
-
-
-
+  def dump_state(self):
+    return f"{self.tr_idx: 3},  {ENTRY_TYPE_SHORT_LABELS[self.entry_type]}, {self.embedding.short_str()}\n"
   
+  def process_completed(self):
+    self.completed.append(self.save())
+    manifold_cellulation = self.construction.build_manifold_cellulation()
+    regina_triangulation = to_regina_triangulation(manifold_cellulation, self.num_tets,self.num_octs)
+    self.iso_sigs.append(regina_triangulation.isoSig())
+    # draw_stack([1, -1, 1, -1, 1, -1], self.construction, f"test_boyd_images/{self.counter:08}.png")
 
+  def next_(self):
 
-  
+    ## TODO END and COMPLETE conditions
+    # breakpoint()
+    # induce
+    while True:
+      ok, tr_idx, next_embedding = self.get_next_induced()
+
+      if not ok:
+        self.rewind()
+        break
+ 
+      if next_embedding is None:
+        # next_open_cell
+        tr_idx = self.get_least_available_cusp_cell_idx()
+        if tr_idx is None:
+          # complete
+          self.process_completed()
+          self.rewind()
+          break
+        else:
+          self.tr_idx = tr_idx
+          self.cusp_cell = self.traversal[tr_idx]
+          self.embedding = None
+          self.entry_type = REGULAR
+          break
+      else:
+        self.tr_idx = tr_idx ## <--
+        self.embedding = next_embedding
+        self.entry_type = INDUCED
+        self.push_state()
+
+    # breakpoint()
+    # next_embedding
+    while True:
+      init, next_embedding = self.get_next_embedding()
+      if next_embedding is None:
+        # rewind
+        while True:
+          if len(self.stack) == 0:
+            # done
+            self.done = True
+            break
+
+          self.pop_state()
+          if self.entry_type == REGULAR:
+            break
+      else:
+        if init:
+          self.entry_type = INIT
+        else:
+          self.entry_type = REGULAR
+        self.embedding = next_embedding
+        self.push_state()
+        break
+    
+    self.counter += 1
+

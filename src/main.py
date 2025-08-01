@@ -1,208 +1,220 @@
-from construction import (
-  Construction,
-  FingerCuspGenerator,
-  Embeddings,
+import argparse
+import logging
+import time
+
+from base import (
   Sqr,
   Tri,
   Oct,
   Tet,
-  INIT,
-  CHOICE,
-  INDUCED,
+  Square,
+  Triangle,
+  Octahedron,
+  Tetrahedron,
   OctSqrEmbedding,
   TetTriEmbedding,
-  stack_to_str,
 )
 
-from itertools import combinations, product
+from construction import (
+  FingerCuspGenerator,
+  Embeddings,
+  Construction,
+)
 
-def generate_iterates(num_tets, num_tris, num_octs, num_sqrs):
-  tet_tri_iterates = [ (0,) + x for x in combinations(range(1, num_tris), num_tets - 1) ]
-  oct_sqr_iterates = [ (0,) + x for x in combinations(range(1, num_sqrs), num_octs - 1) ]
-  return product(tet_tri_iterates, oct_sqr_iterates)
+from stack import (
+  Stack,
+  INIT,
+  REGULAR,
+  INDUCED,
+)
 
-def create_input_stack(tet_indices, oct_indices):
-  input_stack = []
+from export_regina import (
+  to_regina_triangulation
+)
 
-  for tet_idx, tri_idx in enumerate(tet_indices):
-    input_stack.append((TetTriEmbedding(Tet(tet_idx), Tri(tri_idx), (0, 1, 2, 3)), INIT))
+from draw import draw_stack
 
-  for oct_idx, sqr_idx in enumerate(oct_indices):
-    input_stack.append((OctSqrEmbedding(Oct(oct_idx), Sqr(sqr_idx), (0, 1, 2, 3, 4, 5)), INIT))
+DEBUG_REPORT_INTERVAL = 1000
 
-  return input_stack
+def parse_finger_pattern_arg(input_fp: str):
+  if not all(c in '+-' for c in input_fp):
+    raise ValueError("Input finger pattern must consist of '+' and '-' characters")
+  
+  if len(input_fp) % 6 != 0:
+    raise ValueError("Input finger pattern length must be divisible by 6")
+  
+  finger_pattern = []
+  for c in input_fp:
+    if c == '+':
+      finger_pattern.append(1)
+    else:
+      finger_pattern.append(-1)
+  return finger_pattern
+      
+def determine_num_tets_octs(finger_pattern):
+  num_octs = len(finger_pattern) // 6
+  num_tets = 3 * num_octs
+  return num_tets, num_octs
 
-def do_iterate(construction, tet_indices, oct_indices):
-  input_stack = create_input_stack(tet_indices, oct_indices)
-  construction.load_stack(input_stack)
-  for i,_ in enumerate(construction):
-    pass
-
-  print(f"num iterations: {i}")
-  print(f"num completed: {len(construction.completed_stacks)}")
-  for c_stack in construction.completed_stacks:
-    print(stack_to_str(c_stack))
-
-  return construction.completed_stacks
-
-
-if __name__ == '__main__':
-  finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
+def initialize_stack(finger_pattern, num_tets, num_octs):
   cusp_generator = FingerCuspGenerator(finger_pattern)
   cusp = cusp_generator.generate()
   traversal = list(cusp_generator.traversal())
+  embeddings = Embeddings()
+  construction = Construction(cusp, embeddings)
+  stack = Stack(traversal, construction, num_tets, num_octs)
 
-  iterates = list(generate_iterates(6, 24, 2, 12))
-  n = len(iterates)
-  completed_stacks = []
+  return stack
 
-  for i, indices_spec in enumerate(iterates):
-    tet_tri_indices, oct_sqr_indices = indices_spec
-    embeddings = Embeddings()
-    construction = Construction(cusp, embeddings, traversal, num_tets = 6, num_octs = 2)
-    print(f"iterate({i}/{n}): {tet_tri_indices}, {oct_sqr_indices}")
-    completed_stacks_ = do_iterate(construction, tet_tri_indices, oct_sqr_indices)
-    completed_stacks.extend(completed_stacks_)
-
-  print(f"completed_stacks ({len(completed_stacks)})")
-  for c_stack in construction.completed_stacks:
-    print(stack_to_str(c_stack))
+def dump_completed(id, input_stack, output_dir, finger_pattern, num_tets, num_octs):
+  cusp_generator = FingerCuspGenerator(finger_pattern)
+  cusp = cusp_generator.generate()
+  traversal = list(cusp_generator.traversal())
+  embeddings = Embeddings()
+  construction = Construction(cusp, embeddings)
+  stack = Stack(traversal, construction, num_tets, num_octs)
+  stack.load(input_stack)
+  draw_stack(finger_pattern, construction, f"{output_dir}/{id:06}.png")
+  with open(f"{output_dir}/id.txt") as f:
+    f.write(stack.save())
 
 
+def main():
+  logging.basicConfig(
+    level=logging.DEBUG,
+    format='MP-SEARCH|%(levelname)s: %(message)s',
+  )
+
+  parser = argparse.ArgumentParser(description="CLI frontend for Mixed Platonic census")
+
+  parser.add_argument(
+    '-f', '--finger-pattern',
+    type=str,
+    help="String of '+' and '-' encoding the finger pattern" 
+  )
+
+  parser.add_argument(
+    '-d', '--debug-mode',
+    action='store_true',
+    help="Enable debug mode",
+  )
+
+  parser.add_argument(
+    '-o', '--output-dir',
+    type=str,
+    help="Directory to store info on completions" 
+  )
+
+  args = parser.parse_args()
+
+  debug_on = args.debug_mode
+
+  finger_pattern = parse_finger_pattern_arg(args.finger_pattern)
+  num_tets, num_octs = determine_num_tets_octs(finger_pattern)
+
+  logging.info("Beginning search for complete manifolds")
+  logging.info(f"Finger Pattern: {args.finger_pattern}")
+  logging.info(f"Number Tetrahedrons: {num_tets}")
+  logging.info(f"Number Octahedrons: {num_octs}")
+
+  stack = initialize_stack(finger_pattern, num_tets, num_octs)
+  
+  start_time = time.perf_counter()
+  while stack.done == False:
+    stack.next_()
+    if debug_on and stack.counter % DEBUG_REPORT_INTERVAL == 0:
+      check_in_time = time.perf_counter()
+      logging.debug(f"iteration: {stack.counter}, completions: {len(stack.completed)}, runtime: {(check_in_time - start_time):.6f}s")
+  end_time = time.perf_counter()
+
+  logging.info(f"Finish after {stack.counter} iterations in {end_time - start_time:.6f} seconds")
+  logging.info(f"{len(stack.completed)} completions found")
+  if len(stack.iso_sigs) > 0:
+    logging.info("isomorphism signatures:")
+    for sig in stack.iso_sigs:
+      logging.info(sig)
+
+  if debug_on and args.output_dir:
+    for i, output_stacks in enumerate(stack.completed):
+      dump_completed(i, finger_pattern, args.output_dir, finger_pattern, num_tets, num_octs)
+
+
+if __name__ == '__main__':
+  main()
+
+  # def draw_():
+  #   draw_stack(finger_pattern, construction, f"test_stack_images/{stack.counter:06}.png")
+
+  # stack.load(input_stack)
+
+  # while stack.done == False:
+  #     stack.next_()
+  #     if (stack.counter % 1000) == 0:
+  #       print((stack.counter, len(stack.completed)))
+  #   # stack_lens.append((stack.counter, len(stack.stack)))
+  #   # draw_()
+  # breakpoint()
+
+
+
+
+
+
+   
 
 # if __name__ == '__main__':
+#   num_tets = 6
+#   num_octs = 2
 #   finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
 #   cusp_generator = FingerCuspGenerator(finger_pattern)
 #   cusp = cusp_generator.generate()
 #   traversal = list(cusp_generator.traversal())
 #   embeddings = Embeddings()
+#   construction = Construction(cusp, embeddings)
+#   stack = Stack(traversal, construction, num_tets, num_octs)
 
-#   # def tr_gen(num_fingers):
-#   #   for i in range(num_fingers):
-#   #     yield Sqr(i)
-#   #     yield Tri(2*i)
-#   #     yield Tri(2*i + 1)
-
-#   # traversal = list(tr_gen(12))
-
-#   construction = Construction(cusp, embeddings, traversal)
-
-#   # input_stack = [
-#   #   (OctSqrEmbedding(Oct(0), Sqr(0), (0, 1, 2, 3, 4, 5)), CHOICE),
-#   #   (TetTriEmbedding(Tet(0), Tri(0), (0, 1, 2, 3)),       CHOICE),
-#   #   (TetTriEmbedding(Tet(1), Tri(1), (0, 1, 2, 3)),       CHOICE),
-#   #   (OctSqrEmbedding(Oct(1), Sqr(1), (0, 1, 2, 3, 4, 5)), CHOICE),
-#   #   # (TetTriEmbedding(Tet(2), Tri(2), (0, 1, 2, 3)),       CHOICE),
-#   #   # (TetTriEmbedding(Tet(0), Tri(3), (1, 3, 2, 0)),       CHOICE),
-#   #   # (OctSqrEmbedding(Oct(0), Sqr(2), (2, 0, 3, 5, 1, 4)), CHOICE),
-#   #   # (TetTriEmbedding(Tet(3), Tri(4), (0, 1, 2, 3)),       CHOICE),
-#   #   # (TetTriEmbedding(Tet(4), Tri(5), (0, 1, 2, 3)),       CHOICE),
-#   #   # (OctSqrEmbedding(Oct(1), Sqr(3), (3, 4, 5, 2, 0, 1)), CHOICE),
-#   #   # (TetTriEmbedding(Tet(3), Tri(7), (1, 3, 2, 0)),       CHOICE),
-#   # ]
+#   def draw_():
+#     draw_stack(finger_pattern, construction, f"test_stack_images/{stack.counter:06}.png")
 
 #   input_stack = [
-#     (OctSqrEmbedding(Oct(0), Sqr(0), (0, 1, 2, 3, 4, 5)), INIT),
-#     (TetTriEmbedding(Tet(0), Tri(0), (0, 1, 2, 3)),       INIT),
-#     (TetTriEmbedding(Tet(1), Tri(1), (0, 1, 2, 3)),       INIT),
-#     (TetTriEmbedding(Tet(2), Tri(2), (0, 1, 2, 3)),       INIT),
-#     (OctSqrEmbedding(Oct(1), Sqr(1), (0, 1, 2, 3, 4, 5)), INIT),
-#     (TetTriEmbedding(Tet(3), Tri(4), (0, 1, 2, 3)),       INIT),
-#     (TetTriEmbedding(Tet(4), Tri(5), (0, 1, 2, 3)),       INIT),
-#     (TetTriEmbedding(Tet(5), Tri(6), (1, 3, 2, 0)),       INIT),
+#     (INIT, OctSqrEmbedding(Oct(0), Sqr(0), (0, 1, 2, 3, 4, 5))),
+#     (INIT, TetTriEmbedding(Tet(0), Tri(0), (0, 1, 2, 3))),
+#     (INIT, TetTriEmbedding(Tet(1), Tri(1), (0, 1, 2, 3))),
+#     (INIT, OctSqrEmbedding(Oct(1), Sqr(1), (0, 1, 2, 3, 4, 5))),
 #   ]
 
+#   input_stack = [(0, OctSqrEmbedding(Octahedron(0), Square(0), (0, 1, 2, 3, 4, 5))), (0, TetTriEmbedding(Tetrahedron(0), Triangle(0), (0, 1, 2, 3))), (0, TetTriEmbedding(Tetrahedron(1), Triangle(1), (0, 1, 2, 3))), (0, OctSqrEmbedding(Octahedron(1), Square(1), (0, 1, 2, 3, 4, 5))), (0, TetTriEmbedding(Tetrahedron(2), Triangle(2), (0, 1, 2, 3))), (1, TetTriEmbedding(Tetrahedron(0), Triangle(3), (1, 3, 2, 0))), (2, OctSqrEmbedding(Octahedron(0), Square(2), (2, 0, 3, 5, 1, 4))), (2, OctSqrEmbedding(Octahedron(1), Square(11), (4, 5, 3, 0, 1, 2))), (0, TetTriEmbedding(Tetrahedron(3), Triangle(4), (0, 1, 2, 3))), (0, TetTriEmbedding(Tetrahedron(4), Triangle(5), (0, 1, 2, 3))), (1, OctSqrEmbedding(Octahedron(1), Square(3), (3, 4, 5, 2, 0, 1))), (2, TetTriEmbedding(Tetrahedron(3), Triangle(7), (1, 3, 2, 0))), (2, OctSqrEmbedding(Octahedron(0), Square(4), (3, 2, 5, 4, 0, 1))), (2, TetTriEmbedding(Tetrahedron(2), Triangle(8), (3, 1, 0, 2))), (2, TetTriEmbedding(Tetrahedron(0), Triangle(9), (3, 2, 1, 0))), (2, OctSqrEmbedding(Octahedron(1), Square(5), (2, 0, 1, 5, 3, 4))), (2, TetTriEmbedding(Tetrahedron(1), Triangle(10), (1, 2, 0, 3))), (2, TetTriEmbedding(Tetrahedron(2), Triangle(11), (1, 2, 0, 3))), (2, OctSqrEmbedding(Octahedron(0), Square(6), (5, 3, 4, 1, 2, 0))), (2, TetTriEmbedding(Tetrahedron(3), Triangle(13), (3, 2, 1, 0))), (2, OctSqrEmbedding(Octahedron(1), Square(7), (5, 3, 4, 1, 2, 0))), (2, TetTriEmbedding(Tetrahedron(4), Triangle(14), (1, 2, 0, 3))), (2, TetTriEmbedding(Tetrahedron(1), Triangle(16), (3, 2, 1, 0))), (2, OctSqrEmbedding(Octahedron(0), Square(8), (4, 5, 1, 0, 3, 2))), (2, TetTriEmbedding(Tetrahedron(2), Triangle(17), (2, 0, 1, 3))), (2, OctSqrEmbedding(Octahedron(1), Square(9), (1, 2, 0, 4, 5, 3))), (2, TetTriEmbedding(Tetrahedron(0), Triangle(18), (2, 1, 3, 0))), (2, TetTriEmbedding(Tetrahedron(1), Triangle(19), (2, 0, 1, 3))), (2, OctSqrEmbedding(Octahedron(0), Square(10), (1, 4, 0, 2, 5, 3))), (2, TetTriEmbedding(Tetrahedron(4), Triangle(20), (3, 2, 1, 0))), (2, TetTriEmbedding(Tetrahedron(4), Triangle(23), (2, 0, 1, 3))), (2, TetTriEmbedding(Tetrahedron(3), Triangle(22), (2, 1, 3, 0))), (0, TetTriEmbedding(Tetrahedron(5), Triangle(6), (0, 1, 2, 3)))]
 
+#   stack.load(input_stack)
 
-
-#   construction.load_stack(input_stack)
-
-#   BAIL_OUT = 50000
-
-#   print("# STACK TRACE")
-#   print()
-
-#   for i,_ in enumerate(construction):
-#     print(construction.stack_to_str())
-#     if i > BAIL_OUT:
-#       break
-
-
-#   print()
-#   print("# COMPLETED STACKS")
-#   print()
-
-#   for c_stack in construction.completed_stacks:
-#     print(stack_to_str(c_stack))
-
-#   print()
-#   print(f"num iterations: {i}")
-#   print(f"num completed: {len(construction.completed_stacks)}")
+#   while stack.counter <= 100000:
+    
+#     stack.next_()
+    
+#     # stack_lens.append((stack.counter, len(stack.stack)))
+#     # draw_()
+#   breakpoint()
 
 # if __name__ == '__main__':
+#   num_tets = 12
+#   num_octs = 4
 #   finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
 #   cusp_generator = FingerCuspGenerator(finger_pattern)
 #   cusp = cusp_generator.generate()
 #   traversal = list(cusp_generator.traversal())
 #   embeddings = Embeddings()
+#   construction = Construction(cusp, embeddings)
+#   stack = Stack(traversal, construction, num_tets, num_octs)
 
-#   construction = Construction(cusp, embeddings, traversal, num_tets = 12, num_octs = 4)
+#   def draw_():
+#     draw_stack(finger_pattern, construction, f"test_stack_images/{stack.counter:06}.png")
 
-#   # input_stack = [
-#   #   (OctSqrEmbedding(Oct(0), Sqr(0), (0, 1, 2, 3, 4, 5)), CHOICE),
-#   #   (TetTriEmbedding(Tet(0), Tri(0), (0, 1, 2, 3)),       CHOICE),
-#   #   (TetTriEmbedding(Tet(1), Tri(1), (0, 1, 2, 3)),       CHOICE),
-#   #   (OctSqrEmbedding(Oct(1), Sqr(1), (0, 1, 2, 3, 4, 5)), CHOICE),
-#   #   # (TetTriEmbedding(Tet(2), Tri(2), (0, 1, 2, 3)),       CHOICE),
-#   #   # (TetTriEmbedding(Tet(0), Tri(3), (1, 3, 2, 0)),       CHOICE),
-#   #   # (OctSqrEmbedding(Oct(0), Sqr(2), (2, 0, 3, 5, 1, 4)), CHOICE),
-#   #   # (TetTriEmbedding(Tet(3), Tri(4), (0, 1, 2, 3)),       CHOICE),
-#   #   # (TetTriEmbedding(Tet(4), Tri(5), (0, 1, 2, 3)),       CHOICE),
-#   #   # (OctSqrEmbedding(Oct(1), Sqr(3), (3, 4, 5, 2, 0, 1)), CHOICE),
-#   #   # (TetTriEmbedding(Tet(3), Tri(7), (1, 3, 2, 0)),       CHOICE),
-#   # ]
+#   # stack.load(input_stack)
 
-#   input_stack = [
-#     (OctSqrEmbedding(Oct(0), Sqr(0), (0, 1, 2, 3, 4, 5)), INIT),
-#     (TetTriEmbedding(Tet(0), Tri(0), (0, 1, 2, 3)),       INIT),
-#     (TetTriEmbedding(Tet(1), Tri(1), (0, 1, 2, 3)),       INIT),
-#     (TetTriEmbedding(Tet(2), Tri(2), (0, 1, 2, 3)),       INIT),
-#     (OctSqrEmbedding(Oct(1), Sqr(1), (0, 1, 2, 3, 4, 5)), INIT),
-#     (TetTriEmbedding(Tet(3), Tri(4), (0, 1, 2, 3)),       INIT),
-#     (TetTriEmbedding(Tet(4), Tri(5), (0, 1, 2, 3)),       INIT),
-#     (TetTriEmbedding(Tet(5), Tri(6), (1, 3, 2, 0)),       INIT),
-#     (OctSqrEmbedding(Oct(2), Sqr(4), (0, 1, 2, 3, 4, 5)), INIT),
-#     (TetTriEmbedding(Tet(6), Tri(8), (0, 1, 2, 3)),       INIT),
-#     (TetTriEmbedding(Tet(7), Tri(9), (0, 1, 2, 3)),       INIT),
-#     (TetTriEmbedding(Tet(8), Tri(10), (0, 1, 2, 3)),       INIT),
-#     (OctSqrEmbedding(Oct(3), Sqr(5), (0, 1, 2, 3, 4, 5)), INIT),
-#     (TetTriEmbedding(Tet(9), Tri(12), (0, 1, 2, 3)),       INIT),
-#     (TetTriEmbedding(Tet(10), Tri(13), (0, 1, 2, 3)),       INIT),
-#     (TetTriEmbedding(Tet(11), Tri(14), (1, 3, 2, 0)),       INIT),
-#   ]
-
-
-
-#   construction.load_stack(input_stack)
-
-#   BAIL_OUT = 50000
-
-#   print("# STACK TRACE")
-#   print()
-
-#   for i,_ in enumerate(construction):
-#     print(construction.stack_to_str())
-#     if i > BAIL_OUT:
-#       break
-
-
-#   print()
-#   print("# COMPLETED STACKS")
-#   print()
-
-#   for c_stack in construction.completed_stacks:
-#     print(stack_to_str(c_stack))
-
-#   print()
-#   print(f"num iterations: {i}")
-#   print(f"num completed: {len(construction.completed_stacks)}")
+#   while stack.done == False:
+#       stack.next_()
+#       if (stack.counter % 1000) == 0:
+#         print((stack.counter, len(stack.completed)))
+#     # stack_lens.append((stack.counter, len(stack.stack)))
+#     # draw_()
+#   breakpoint()
