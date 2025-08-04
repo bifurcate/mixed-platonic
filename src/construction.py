@@ -71,13 +71,13 @@ class Cusp:
     return [tuple(cp) for cp in self.pairs]
   
   def load(self, data):
-    for cp_tuple in data:
-      cp = cusp_edge_pairing_from_tuple(cp_tuple)
+    for pairing in data:
+      cp = cusp_edge_pairing_from_tuple(pairing)
       self.pair(
         cp.half_edge_src.cusp_cell,
-        cp.half_edge_src.edge_spec,
+        tuple(cp.half_edge_src.edge_spec),
         cp.half_edge_tgt.cusp_cell,
-        cp.half_edge_tgt.edge_spec,
+        tuple(cp.half_edge_tgt.edge_spec),
       )
   
 class ManifoldCellulation:
@@ -189,6 +189,14 @@ class FingerCuspGenerator:
       yield Sqr(i)
       yield Tri(2*i)
       yield Tri(2*i + 1)
+
+# TODO: make traversal an class
+def dump_traversal(traversal):
+  return [tuple(cell) for cell in traversal]
+
+def load_traversal(data):
+  return [cusp_cell_from_tuple(tuple(cell_tuple)) for cell_tuple in data] 
+
 
 class Embeddings:
   def __init__(self):
@@ -539,167 +547,3 @@ class Construction():
             fp.half_face_tgt.manifold_cell, fp.half_face_tgt.face_spec,
           )
     return mc
-
-  def is_complete(self):
-    return (self.get_least_available_cusp_cell_idx() is None)
-  
-  def get_least_available_cusp_cell_idx(self):
-    for idx, cusp_cell in enumerate(self.traversal):
-      em = self.embeddings.get_embedding_by_cusp_cell(cusp_cell)
-      if em is None:
-        return idx
-    return None
-
-  def induce_one(self):
-    # TODO: make this more efficient, right now we check everything!
-    for cusp_cell in self.traversal:
-      existing_embedding = self.embeddings.get_embedding_by_cusp_cell(cusp_cell)
-
-      proposed_embedding = self.get_induced_embedding_for_cell(cusp_cell)
-
-      if proposed_embedding is None:
-        continue
-
-      if existing_embedding is None:
-          self.push_embedding(proposed_embedding, INDUCED)
-          return proposed_embedding
-      else:
-        if existing_embedding != proposed_embedding:
-          raise ValueError('embedding inconsistency')
-        
-  def induce(self):
-    while True:
-      induced_embedding = self.induce_one()
-      if induced_embedding is None:
-        break
-
-  def get_next_embedding(self, cusp_cell: CuspCell):
-    cusp_cell_idx = cusp_cell.cell_index
-    if cusp_cell.is_tri():
-      MCell = Tet
-      Emb = TetTriEmbedding
-      num_manifold_cells = self.num_tets
-      num_verts = 4
-      num_perms = 6
-
-    elif cusp_cell.is_sqr():
-      MCell = Oct
-      Emb = OctSqrEmbedding
-      num_manifold_cells = self.num_octs
-      num_verts = 6
-      num_perms = 8
-
-    em = self.embeddings.get_embedding_by_cusp_cell(cusp_cell)
-
-    if em is None:
-      manifold_cell_idx = 0
-      vert_idx = 0
-      perm_idx = 0
-      if not self.embeddings.is_vert_embedded(MCell(manifold_cell_idx), vert_idx):
-          return Emb.from_indices(manifold_cell_idx, cusp_cell_idx, vert_idx, perm_idx)
-    else:
-      vert_idx, perm_idx = em.get_indices()
-      manifold_cell_idx = em.manifold_cell.cell_index
-      
-      if vert_idx == 0:
-        # this is a hacky way to skip to the next cell if it is the first embedding
-        # of the cell, make this more elegant
-        vert_idx = num_verts
-      elif perm_idx < (num_perms - 1):
-        perm_idx += 1
-        return Emb.from_indices(manifold_cell_idx, cusp_cell_idx, vert_idx, perm_idx)
-      perm_idx = 0
-      
-    while True:
-      if vert_idx < (num_verts - 1):
-        vert_idx += 1
-        if not self.embeddings.is_vert_embedded(MCell(manifold_cell_idx), vert_idx):
-          return Emb.from_indices(manifold_cell_idx, cusp_cell_idx, vert_idx, perm_idx)
-      else:
-        vert_idx = 0
-        if manifold_cell_idx < (num_manifold_cells - 1):
-          manifold_cell_idx += 1
-          if not self.embeddings.is_vert_embedded(MCell(manifold_cell_idx), vert_idx):
-            return Emb.from_indices(manifold_cell_idx, cusp_cell_idx, vert_idx, perm_idx)
-        else:
-          return None
-        
-  def choose(self, cusp_cell: CuspCell):
-    em = self.get_next_embedding(cusp_cell)
-    if self.embeddings.get_embedding_by_cusp_cell(cusp_cell) is not None:
-      self.pop_embedding()
-    if em is None:
-      return None
-    self.push_embedding(em, CHOICE)
-    return em
-  
-  def push_embedding(self, embedding: Embedding, stack_type: int):
-    self.stack.append((embedding, stack_type))
-    self.embeddings.add_embedding(embedding)
-  
-  def pop_embedding(self):
-    if not self.stack:
-      return None
-    em, tp = self.stack.pop()
-    self.embeddings.remove_embedding(em)
-    return (em, tp)
-  
-  def peek_embedding(self):
-    return (self.stack[-1] if self.stack else None)
-  
-  def init_stack(self):
-    cusp_cell = self.traversal[0]
-    self.choose(cusp_cell)
-
-  def rewind(self):
-    while True:
-      em, tp = self.peek_embedding()
-      if tp == INDUCED:
-        self.pop_embedding()
-      else:
-        break
-  
-  def load_stack(self, input_stack):
-    # this assumes the construction has just been initialized
-    for em, tp in input_stack:
-      self.push_embedding(em, tp)
-  
-  def stack_to_str(self):
-    s = stack_to_str(self.stack)
-    s += f" ! {self.exc_state}"
-    return s
-  
-  def __iter__(self):
-    return self
-
-  def __next__(self):
-    if not self.stack:
-      self.init_stack()
-      return
-    
-    try:
-      self.induce()
-      tr_idx = self.get_least_available_cusp_cell_idx()
-      if tr_idx is None:
-        self.completed_stacks.append(self.stack[:])
-        self.mc = self.build_manifold_cellulation()
-        raise ValueError('complete')
-      cusp_cell = self.traversal[tr_idx]
-    except ValueError as e:
-      self.exc_state = str(e)
-      self.rewind()
-      em, tp = self.peek_embedding()
-      cusp_cell = em.cusp_cell
-
-    while True:
-      chosen_embedding = self.choose(cusp_cell)
-      if chosen_embedding is None:
-        if not self.stack:
-          raise StopIteration
-        self.rewind()
-        em, tp = self.peek_embedding()
-        if tp == INIT:
-          raise StopIteration
-        cusp_cell = em.cusp_cell
-      else:
-        break

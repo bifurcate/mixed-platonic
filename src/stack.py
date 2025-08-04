@@ -9,6 +9,7 @@ from base import (
   Octahedron,
   TetTriEmbedding,
   OctSqrEmbedding,
+  embedding_from_tuple,
 )
 
 from construction import (
@@ -135,8 +136,8 @@ class Stack:
     )
     self.done = False
     self.counter = 0
-    self.completed = []
-    self.iso_sigs = []
+    # self.completed = []
+    # self.iso_sigs = []
 
   def get_next_embedding(self):
     if self.cusp_cell.is_tri():
@@ -205,19 +206,20 @@ class Stack:
     return None
   
   def load(self, input_stack: list[tuple[int, Embedding]]):
-    for tp, em in input_stack:
+    for tp, em_tuple in input_stack:
+      em = embedding_from_tuple(em_tuple)
       self.cusp_cell = em.cusp_cell
       self.embedding = em
       self.tr_idx = self.traversal.index(em.cusp_cell)
       self.entry_type = tp
       self.push_state()
 
-  def save(self):
+  def dump(self):
     output_stack = []
     for tr_idx, tp in self.stack:
       cusp_cell = self.traversal[tr_idx]
       em = self.construction.embeddings.get_embedding_by_cusp_cell(cusp_cell)
-      output_stack.append((tp, em))
+      output_stack.append((tp, tuple(em)))
     return output_stack
 
   def pop_state(self):
@@ -236,37 +238,37 @@ class Stack:
       if self.entry_type == REGULAR:
         break
 
-  def next_open_cell(self):
-    self.tr_idx = self.get_least_available_cusp_cell_idx()
-    self.cusp_cell = self.traversal[self.tr_idx]
-    self.embedding = None
-    self.entry_type = REGULAR
+  # def next_open_cell(self):
+  #   self.tr_idx = self.get_least_available_cusp_cell_idx()
+  #   self.cusp_cell = self.traversal[self.tr_idx]
+  #   self.embedding = None
+  #   self.entry_type = REGULAR
 
-  def next_embedding(self):
-    embedding = self.get_next_embedding()
+  # def next_embedding(self):
+  #   embedding = self.get_next_embedding()
 
-    if embedding is None:
-      self.rewind()
-      return
+  #   if embedding is None:
+  #     self.rewind()
+  #     return
     
-    self.embedding = embedding
-    self.entry_type = REGULAR
-    self.push_state()
+  #   self.embedding = embedding
+  #   self.entry_type = REGULAR
+  #   self.push_state()
 
-  def induce(self):
-    while True:
-      ok, tr_idx, next_embedding = self.get_next_induced()
-      if not ok:
-        self.rewind()
-        break
+  # def induce(self):
+  #   while True:
+  #     ok, tr_idx, next_embedding = self.get_next_induced()
+  #     if not ok:
+  #       self.rewind()
+  #       break
 
-      if next_embedding is not None:
-        self.tr_idx = tr_idx
-        self.embedding = next_embedding
-        self.entry_type = INDUCED
-        self.push_state()
-      else:
-        self.next_open_cell()
+  #     if next_embedding is not None:
+  #       self.tr_idx = tr_idx
+  #       self.embedding = next_embedding
+  #       self.entry_type = INDUCED
+  #       self.push_state()
+  #     else:
+  #       self.next_open_cell()
 
   # def next(self):
   #   while True:
@@ -274,7 +276,7 @@ class Stack:
   #     if ok:
   #       self.induce()
 
-  def dump_stack(self):
+  def pp_stack(self):
     s = ''
     for stack_entry in reversed(self.stack):
       tr_idx, tp = stack_entry
@@ -283,14 +285,14 @@ class Stack:
       s += f"{tr_idx:3}, {ENTRY_TYPE_SHORT_LABELS[tp]}, {em.short_str()}\n"
     return s
   
-  def dump_state(self):
+  def pp_state(self):
     return f"{self.tr_idx: 3},  {ENTRY_TYPE_SHORT_LABELS[self.entry_type]}, {self.embedding.short_str()}\n"
   
-  def process_completed(self):
-    self.completed.append(self.save())
-    manifold_cellulation = self.construction.build_manifold_cellulation()
-    regina_triangulation = to_regina_triangulation(manifold_cellulation, self.num_tets,self.num_octs)
-    self.iso_sigs.append(regina_triangulation.isoSig())
+  # def process_completed(self):
+    # self.completed.append(self.dump())
+    # manifold_cellulation = self.construction.build_manifold_cellulation()
+    # regina_triangulation = to_regina_triangulation(manifold_cellulation, self.num_tets,self.num_octs)
+    # self.iso_sigs.append(regina_triangulation.isoSig())
     # draw_stack([1, -1, 1, -1, 1, -1], self.construction, f"test_boyd_images/{self.counter:08}.png")
 
   def next_(self):
@@ -299,6 +301,8 @@ class Stack:
     # breakpoint()
     # induce
     while True:
+      completed = None
+
       ok, tr_idx, next_embedding = self.get_next_induced()
 
       if not ok:
@@ -310,7 +314,7 @@ class Stack:
         tr_idx = self.get_least_available_cusp_cell_idx()
         if tr_idx is None:
           # complete
-          self.process_completed()
+          completed = self.dump()
           self.rewind()
           break
         else:
@@ -350,4 +354,4 @@ class Stack:
         break
     
     self.counter += 1
-
+    return completed

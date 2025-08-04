@@ -252,6 +252,15 @@ class Octahedron(ManifoldCell):
 
 Oct = Octahedron
 
+MANIFOLD_CELL_CLASS = {
+  None: ManifoldCell,
+  TET: Tetrahedron,
+  OCT: Octahedron,
+}
+
+def manifold_cell_from_tuple(cell_tuple):
+  return MANIFOLD_CELL_CLASS[cell_tuple[0]](cell_tuple[1])
+
 EdgeSpec = tuple[int, int]
 
 class CuspHalfEdge:
@@ -568,7 +577,20 @@ class OctSqrEmbedding(Embedding):
     if embedding_spec is None:
       raise ValueError('invalid indices')
     return cls(Oct(manifold_cell_idx), Sqr(cusp_cell_idx), embedding_spec)
-  
+
+EMBEDDING_CLASS = {
+  None: Embedding,
+  TET_TRI: TetTriEmbedding,
+  OCT_SQR: OctSqrEmbedding,
+}
+
+def embedding_from_tuple(embedding_tuple):
+  return EMBEDDING_CLASS[embedding_tuple[0]](
+    manifold_cell_from_tuple(embedding_tuple[1]),
+    cusp_cell_from_tuple(embedding_tuple[2]),
+    tuple(embedding_tuple[3])
+  )
+
 # CHOICE = 0
 # INDUCED = 1
 
