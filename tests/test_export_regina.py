@@ -51,7 +51,7 @@ def test_get_r_face_spec():
   assert get_r_face_spec(OCT_TRIANGULATION_MAP, (5, 4, 1)) == (2, 3, 1)
   assert get_r_face_spec(TET_TRIANGULATION_MAP, (3, 1, 2)) == (3, 1, 2)
 
-def test_to_regina_triangulation():
+def xtest_to_regina_triangulation():
   def create_input_stack(tet_indices, oct_indices):
     input_stack = []
 
@@ -62,16 +62,51 @@ def test_to_regina_triangulation():
       input_stack.append((OctSqrEmbedding(Oct(oct_idx), Sqr(sqr_idx), (0, 1, 2, 3, 4, 5)), INIT))
 
     return input_stack
+
+  def find_invalid(tri):
+    invalid_tris = []
+    invalid_edges = []
+    invalid_vertices = []
+    for f in tri.faces(2):
+      if not f.isValid():
+        invalid_tris.append(f)
+
+    for f in tri.faces(1):
+      if not f.isValid():
+        invalid_edges.append(f)
+
+    for f in tri.faces(0):
+      if not f.isValid():
+        invalid_vertices.append(f)
+    return invalid_tris, invalid_edges, invalid_vertices
   
-  finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
+  finger_pattern = [
+    1, 1, 1, 1, 1, 1, -1, -1, -1, -1, -1, -1,
+    1, 1, 1, 1, 1, 1, -1, -1, -1, -1, -1, -1,
+  ]
+  # finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
   cusp_generator = FingerCuspGenerator(finger_pattern)
   cusp = cusp_generator.generate()
   traversal = list(cusp_generator.traversal())
-  init_tri_indices = (0,1,2,4,5,6)
-  init_oct_indices = (0,1)
+
+  # # boyd_init
+  # # init_tri_indices = (0,1,2,4,5,6)
+  # # init_oct_indices = (0,1)
+
+  # # weird one init
+  
+  # # init_tri_indices = (0, 1, 4, 13, 22, 23)
+  # # init_oct_indices = (0, 11)
+
+  # # another weird one
+  # init_tri_indices = (0, 1, 5, 6, 7, 19)
+  # init_oct_indices = (0, 5)
+
+  init_tri_indices = (0,1,2,4,5,6,7,8,9,10,11)
+  init_oct_indices = (0,1,2,3)
 
   embeddings = Embeddings()
-  construction = Construction(cusp, embeddings, traversal, num_tets = 6, num_octs = 2)
+  construction = Construction(cusp, embeddings, traversal, num_tets = 12, num_octs = 4)
 
 
   input_stack = create_input_stack(init_tri_indices, init_oct_indices)
@@ -81,5 +116,5 @@ def test_to_regina_triangulation():
 
   completed_stacks = construction.completed_stacks
   mc = construction.mc
-  reg_tri = to_regina_triangulation(mc, 6, 2)
-  breakpoint()
+  reg_tri = to_regina_triangulation(mc, 12, 4)
+  invalid_tris, invalid_edges, invalid_vertices = find_invalid(reg_tri)

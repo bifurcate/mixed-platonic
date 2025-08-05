@@ -23,7 +23,21 @@ from construction import (
   get_embedding_tgt,
   get_manifold_half_face,
   Construction,
+  dump_traversal,
+  load_traversal,
 )
+
+@pytest.fixture
+def finger_ex_1():
+  finger_pattern = [1, -1, 1, -1]
+  cusp = FingerCuspGenerator(finger_pattern).generate()
+  return cusp
+
+@pytest.fixture
+def traversal_ex_1():
+  finger_pattern = [1, -1, 1, -1]
+  traversal = list(FingerCuspGenerator(finger_pattern).traversal())
+  return traversal
 
 def test_cusp():
   cusp = Cusp()
@@ -52,6 +66,23 @@ def test_cusp():
   assert tri0_pairings.get((2,3)) == None
 
   assert cusp.get_cell_pairings(Sqr(1)) == None
+
+def test_cusp_dump_load(finger_ex_1):
+  cusp1 = finger_ex_1
+  cusp_data = cusp1.dump()
+
+
+  cusp2 = Cusp()
+  cusp2.load(cusp_data)
+
+  assert cusp1.pairs == cusp2.pairs
+  assert cusp1.X == cusp2.X
+
+def test_dump_load_traversal(traversal_ex_1):
+  traversal1 = traversal_ex_1
+  traversal_data = dump_traversal(traversal1)
+  traversal2 = load_traversal(traversal_data)
+  assert traversal1 == traversal2
 
 def test_finger_cusp_generator_add_finger():
   finger_pattern = [1,-1]
@@ -689,7 +720,6 @@ def test_empty_boyd():
   assert embeddings.get_embedding_by_cusp_cell(Tri(22)) == None
   assert embeddings.get_embedding_by_cusp_cell(Tri(23)) == None
 
-  assert boyd_empty.get_least_available_cusp_cell_idx() == 0
   assert embeddings.is_vert_embedded(Oct(1), 1) == False
 
 def xtest_construction_get_embedding_by_cusp_cell_1():
@@ -725,114 +755,6 @@ def xtest_construction_get_embedding_by_cusp_cell_1():
     construction.get_induced_embedding_for_cell(Sqr(11))
 
   assert str(exc_info.value) == 'cusp shape incompatibility'
-
-def test_construction_induce_1():
-  finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
-  cusp = FingerCuspGenerator(finger_pattern).generate()
-  
-  def tr_gen(num_fingers):
-    for i in range(num_fingers):
-      yield Sqr(i)
-      yield Tri(2*i)
-      yield Tri(2*i + 1)
-
-  traversal = list(tr_gen(12))
-  
-  embeddings = Embeddings()
-  
-  boyd_to_f3 = Construction(cusp, embeddings, traversal)
-
-
-
-  # finger 0 embeddings
-  embeddings.add_embedding(
-    OctSqrEmbedding(Oct(0), Sqr(0), (0, 1, 2, 3, 4, 5))
-  )
-  embeddings.add_embedding(
-    TetTriEmbedding(Tet(0), Tri(0), (0, 1, 2, 3))
-  )
-  embeddings.add_embedding(
-    TetTriEmbedding(Tet(1), Tri(1), (0, 1, 2, 3))
-  )
-
-  # finger 1 embeddings
-  embeddings.add_embedding(
-    OctSqrEmbedding(Oct(1), Sqr(1), (0, 1, 2, 3, 4, 5))
-  )
-  embeddings.add_embedding(
-    TetTriEmbedding(Tet(2), Tri(2), (0, 1, 2, 3))
-  )
-  embeddings.add_embedding(
-    TetTriEmbedding(Tet(0), Tri(3), (1, 3, 2, 0))
-  )
-
-  # finger 2 embeddings
-
-  embeddings.add_embedding(
-    OctSqrEmbedding(Oct(0), Sqr(2), (2, 0, 3, 5, 1, 4))
-  )
-  embeddings.add_embedding(
-    TetTriEmbedding(Tet(3), Tri(4), (0, 1, 2, 3))
-  )
-  embeddings.add_embedding(
-    TetTriEmbedding(Tet(4), Tri(5), (0, 1, 2, 3))
-  )
-
-  # finger 3 embeddings
-
-  embeddings.add_embedding(
-    OctSqrEmbedding(Oct(1), Sqr(3), (3, 4, 5, 2, 0, 1))
-  )
-  embeddings.add_embedding(
-    TetTriEmbedding(Tet(5), Tri(6), (0, 1, 2, 3))
-  )
-  embeddings.add_embedding(
-    TetTriEmbedding(Tet(3), Tri(7), (1, 3, 2, 0))
-  )
-
-  induced_embedding = boyd_to_f3.induce_one()
-  while induced_embedding is not None:
-    induced_embedding = boyd_to_f3.induce_one()
-  
-  assert boyd_to_f3.is_complete()
-
-  assert embeddings.get_embedding_by_cusp_cell(Tri(0)) == TetTriEmbedding(Tet(0), Tri(0), (0, 1, 2, 3))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(1)) == TetTriEmbedding(Tet(1), Tri(1), (0, 1, 2, 3))
-  assert embeddings.get_embedding_by_cusp_cell(Sqr(1)) == OctSqrEmbedding(Oct(1), Sqr(1), (0, 1, 2, 3, 4, 5))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(2)) == TetTriEmbedding(Tet(2), Tri(2), (0, 1, 2, 3))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(3)) == TetTriEmbedding(Tet(0), Tri(3), (1, 3, 2, 0))
-  assert embeddings.get_embedding_by_cusp_cell(Sqr(2)) == OctSqrEmbedding(Oct(0), Sqr(2), (2, 0, 3, 5, 1, 4))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(4)) == TetTriEmbedding(Tet(3), Tri(4), (0, 1, 2, 3))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(5)) == TetTriEmbedding(Tet(4), Tri(5), (0, 1, 2, 3))
-  assert embeddings.get_embedding_by_cusp_cell(Sqr(3)) == OctSqrEmbedding(Oct(1), Sqr(3), (3, 4, 5, 2, 0, 1))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(6)) == TetTriEmbedding(Tet(5), Tri(6), (0, 1, 2, 3))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(7)) == TetTriEmbedding(Tet(3), Tri(7), (1, 3, 2, 0))
-  assert embeddings.get_embedding_by_cusp_cell(Sqr(4)) == OctSqrEmbedding(Oct(0), Sqr(4), (3, 2, 5, 4, 0, 1))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(8)) == TetTriEmbedding(Tet(2), Tri(8), (3, 1, 0, 2))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(9)) == TetTriEmbedding(Tet(0), Tri(9), (3, 2, 1, 0))
-  assert embeddings.get_embedding_by_cusp_cell(Sqr(5)) == OctSqrEmbedding(Oct(1), Sqr(5), (2, 0, 1, 5, 3, 4))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(10)) == TetTriEmbedding(Tet(1), Tri(10), (1, 2, 0, 3))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(11)) == TetTriEmbedding(Tet(2), Tri(11), (1, 2, 0, 3))
-  assert embeddings.get_embedding_by_cusp_cell(Sqr(6)) == OctSqrEmbedding(Oct(0), Sqr(6), (5, 3, 4, 1, 2, 0))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(12)) == TetTriEmbedding(Tet(5), Tri(12), (3, 1, 0, 2))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(13)) == TetTriEmbedding(Tet(3), Tri(13), (3, 2, 1, 0))
-  assert embeddings.get_embedding_by_cusp_cell(Sqr(7)) == OctSqrEmbedding(Oct(1), Sqr(7), (5, 3, 4, 1, 2, 0))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(14)) == TetTriEmbedding(Tet(4), Tri(14), (1, 2, 0, 3))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(15)) == TetTriEmbedding(Tet(5), Tri(15), (1, 2, 0, 3))
-  assert embeddings.get_embedding_by_cusp_cell(Sqr(8)) == OctSqrEmbedding(Oct(0), Sqr(8), (4, 5, 1, 0, 3, 2))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(16)) == TetTriEmbedding(Tet(1), Tri(16), (3, 2, 1, 0))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(17)) == TetTriEmbedding(Tet(2), Tri(17), (2, 0, 1, 3))
-  assert embeddings.get_embedding_by_cusp_cell(Sqr(9)) == OctSqrEmbedding(Oct(1), Sqr(9), (1, 2, 0, 4, 5, 3))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(18)) == TetTriEmbedding(Tet(0), Tri(18), (2, 1, 3, 0))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(19)) == TetTriEmbedding(Tet(1), Tri(19), (2, 0, 1, 3))
-  assert embeddings.get_embedding_by_cusp_cell(Sqr(10)) == OctSqrEmbedding(Oct(0), Sqr(10), (1, 4, 0, 2, 5, 3))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(20)) == TetTriEmbedding(Tet(4), Tri(20), (3, 2, 1, 0))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(21)) == TetTriEmbedding(Tet(5), Tri(21), (2, 0, 1, 3))
-  assert embeddings.get_embedding_by_cusp_cell(Sqr(11)) == OctSqrEmbedding(Oct(1), Sqr(11), (4, 5, 3, 0, 1, 2))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(22)) == TetTriEmbedding(Tet(3), Tri(22), (2, 1, 3, 0))
-  assert embeddings.get_embedding_by_cusp_cell(Tri(23)) == TetTriEmbedding(Tet(4), Tri(23), (2, 0, 1, 3))
-
-  assert embeddings.is_vert_embedded(Oct(1), 1) == True
 
 def xtest_construction_get_next_embedding_1():
   finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]

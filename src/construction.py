@@ -109,88 +109,9 @@ class ManifoldCellulation:
 
   def get_cell_pairings(self, manifold_cell: ManifoldCell) -> dict[FaceSpec, ManifoldFacePairing]:
     return self.X.get(manifold_cell)
-  
 
-# TODO: be more specific with the type here
-FingerPattern = list[int]
 
-class FingerCuspGenerator:
-  def __init__(self, finger_pattern: FingerPattern):
-    self.cusp = Cusp()
-    self.finger_pattern = finger_pattern
-    self.current_idx = 0
-
-  def add_finger(self, idx):
-    sqr0 = Sqr(idx)
-    tri0 = Tri(2 * idx)
-    tri1 = Tri(2 * idx + 1)
-
-    # self.cusp.add_cell(sqr0)
-    # self.cusp.add_cell(tri0)
-    # self.cusp.add_cell(tri1)
-
-    self.cusp.pair(
-      sqr0, (2, 3),
-      tri0, (1, 3),
-    )
-
-    self.cusp.pair(
-      tri0, (2, 3),
-      tri1, (2, 1),
-    )
-
-    self.cusp.pair(
-      tri1, (2, 3),
-      sqr0, (1, 4),
-    )
-
-  def connect_fingers_pos(self, idx_src, idx_tgt):
-    self.cusp.pair(
-      Sqr(idx_src), (3, 4), 
-      Sqr(idx_tgt), (2, 1),
-    )
-
-    self.cusp.pair(
-      Tri(2 * idx_src + 1), (1, 3),
-      Tri(2 * idx_tgt),     (1, 2)
-    )
-  
-  def connect_fingers_neg(self, idx_src, idx_tgt):
-    self.cusp.pair(
-      Sqr(idx_src),     (3, 4),
-      Tri(2 * idx_tgt), (1, 2),
-    )
-
-    self.cusp.pair(
-      Tri(2 * idx_src + 1), (1, 3),
-      Sqr(idx_tgt),         (2, 1),
-    )
-  
-  def generate(self) -> Cusp:
-    n = len(self.finger_pattern)
-    for i in range(n):
-      self.add_finger(i)
-    
-    for i in range(n-1):
-      if self.finger_pattern[i] == self.finger_pattern[i+1]:
-        self.connect_fingers_pos(i, i+1)
-      else:
-        self.connect_fingers_neg(i, i+1)
-    
-    if self.finger_pattern[n-1] == self.finger_pattern[0]:
-      self.connect_fingers_pos(n-1, 0)
-    else:
-      self.connect_fingers_neg(n-1, 0)
-      
-    return self.cusp
-  
-  def traversal(self):
-    for i in range(len(self.finger_pattern)):
-      yield Sqr(i)
-      yield Tri(2*i)
-      yield Tri(2*i + 1)
-
-# TODO: make traversal an class
+# TODO: make traversal a class
 def dump_traversal(traversal):
   return [tuple(cell) for cell in traversal]
 
@@ -362,26 +283,7 @@ def get_embedding_tgt(
       tuple(embedding_spec_tgt)
     )
   
-INIT = 0
-CHOICE = 1
-INDUCED = 2
-
-def stack_to_str(stack):
-  s = ''
-  for em, tp in stack:
-    s += '['
-    if tp == CHOICE:
-      s += 'C'
-    elif tp == INDUCED:
-      s += 'I'
-    elif tp == INIT:
-      s += 'X'
-    if em.is_tet_tri():
-      s += f", Tri({em.cusp_cell.cell_index}), Tet({em.manifold_cell.cell_index}), {em.embedding_spec}], "
-    elif em.is_oct_sqr():
-      s += f", Sqr({em.cusp_cell.cell_index}), Oct({em.manifold_cell.cell_index}), {em.embedding_spec}], "
-  s = s[:-2]
-  return s
+# TODO: traversal concept does not need to be in construction. remove and adjust implementation
 
 class Construction():
   def __init__(self, cusp: Cusp, embeddings: Embeddings, traversal: list[CuspCell] = [], num_tets = 6, num_octs = 2):

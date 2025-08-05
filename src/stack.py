@@ -19,10 +19,6 @@ from construction import (
   Construction,
 )
 
-from export_regina import (
-  to_regina_triangulation
-)
-
 from draw import (
   draw_stack
 )
