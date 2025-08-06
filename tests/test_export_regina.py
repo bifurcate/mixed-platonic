@@ -85,7 +85,8 @@ def xtest_to_regina_triangulation():
     1, 1, 1, 1, 1, 1, -1, -1, -1, -1, -1, -1,
   ]
   # finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
-  cusp_generator = FingerCuspGenerator(finger_pattern)
+  cusp = Cusp()
+  cusp_generator = FingerCuspGenerator(cusp, finger_pattern)
   cusp = cusp_generator.generate()
   traversal = list(cusp_generator.traversal())
 

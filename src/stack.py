@@ -1,8 +1,6 @@
 from base import (
   EmbeddingType,
   Embedding,
-  CuspCellIndex,
-  ManifoldCellType,
   TET_TRI,
   OCT_SQR,
   Tetrahedron,
@@ -13,14 +11,8 @@ from base import (
 )
 
 from construction import (
-  Cusp,
-  FingerCuspGenerator,
   Embeddings,
   Construction,
-)
-
-from draw import (
-  draw_stack
 )
 
 class EmbeddingIterator:

@@ -19,6 +19,7 @@ from construction import (
   FingerCuspGenerator,
   Embeddings,
   Construction,
+  Cusp,
 )
 
 from stack import (
@@ -67,7 +68,8 @@ def initialize_stack(finger_pattern, num_tets, num_octs):
   return stack
 
 def dump_completed(id, input_stack, output_dir, finger_pattern, num_tets, num_octs):
-  cusp_generator = FingerCuspGenerator(finger_pattern)
+  cusp = Cusp()
+  cusp_generator = FingerCuspGenerator(cusp, finger_pattern)
   cusp = cusp_generator.generate()
   traversal = list(cusp_generator.traversal())
   embeddings = Embeddings()
@@ -134,9 +136,9 @@ def main():
     for sig in stack.iso_sigs:
       logging.info(sig)
 
-  if debug_on and args.output_dir:
-    for i, output_stacks in enumerate(stack.completed):
-      dump_completed(i, finger_pattern, args.output_dir, finger_pattern, num_tets, num_octs)
+  # if debug_on and args.output_dir:
+  #   for i, output_stacks in enumerate(stack.completed):
+  #     dump_completed(i, finger_pattern, args.output_dir, finger_pattern, num_tets, num_octs)
 
 
 if __name__ == '__main__':
