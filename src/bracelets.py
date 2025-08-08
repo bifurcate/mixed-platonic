@@ -1,4 +1,10 @@
-from itertools import product
+from itertools import (
+  product,
+  combinations_with_replacement,
+) 
+
+def flatten_1(nested_tuple):
+  return tuple(item for sub in nested_tuple for item in sub)
 
 def rotate(seq, i):
   return seq[i:] + seq[:i]
@@ -29,6 +35,30 @@ def generate_2_bracelets(n: int):
   for seq in product([1, -1], repeat=n):
     if is_canonical(seq):
       yield seq
+
+def partitions_no_ones(n, max_val=None):
+    if max_val is None:
+        max_val = n
+    if n == 0:
+        yield []
+    else:
+        for i in range(min(max_val, n), 1, -1):
+            for p in partitions_no_ones(n - i, i):
+                yield [i] + p
+
+def generate_multi_2_bracelets_from_partition(partition):
+  uniq_elements = sorted(list(set(partition)))
+  factors = []
+  for x in uniq_elements:
+    count = partition.count(x)
+    factors.append(combinations_with_replacement(generate_2_bracelets(x), count))
+
+  return (flatten_1(T) for T in product(*factors))
+
+def generate_multi_2_bracelets(n: int):
+   for p in partitions_no_ones(n):
+      for mb in generate_multi_2_bracelets_from_partition(p):
+         yield mb
 
 
     

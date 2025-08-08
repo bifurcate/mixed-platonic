@@ -19,6 +19,18 @@ def to_finger_pattern_str(finger_pattern: FingerPattern):
       s += '+'
   return s
 
+def to_multi_finger_pattern_str(multi_finger_pattern):
+  s = ''
+  for fp in multi_finger_pattern:
+    s += '|'
+    for x in fp:
+      if x == -1:
+        s += '-'
+      else:
+        s += '+'
+  s += '|'
+  return s
+
 class FingerCuspGenerator:
   def __init__(self, cusp: Cusp, finger_pattern: FingerPattern):
     self.cusp = cusp

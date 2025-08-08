@@ -2,9 +2,33 @@ import argparse
 import logging
 from pathlib import Path
 
-from generate import generate
-from bracelets import generate_2_bracelets
-from finger_cusp import to_finger_pattern_str
+from generate import (
+  generate,
+  generate_multi,
+)
+from bracelets import (
+  generate_2_bracelets,
+  generate_multi_2_bracelets,
+)
+
+from finger_cusp import (
+  to_finger_pattern_str,
+  to_multi_finger_pattern_str,
+)
+
+def generate_multi_census(census_root, n):
+
+  try:
+    Path(census_root).mkdir()
+  except FileExistsError:
+    logging.error(f"census {census_root.name} already exists")
+
+  logging.info("Generating census '{census_root.name}'")
+
+  for mfp in generate_multi_2_bracelets(n):
+    mfp_str = to_multi_finger_pattern_str(mfp)
+    env_path = census_root / mfp_str
+    generate_multi(env_path, mfp)
 
 def main():
 

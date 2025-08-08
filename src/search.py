@@ -55,6 +55,7 @@ def read_state(env_path: Path) -> str:
   return state_data['state']
 
 def search(env_path, debug=False):
+  env_path = Path(env_path)
 
   search_logger = logging.getLogger('search_logger')
   search_logger.setLevel(logging.DEBUG)
@@ -113,6 +114,8 @@ def search(env_path, debug=False):
   start_time = time.perf_counter()
   num_completed = 0
   while stack.done == False:
+    search_logger.debug(f"iter {stack.counter}")
+    search_logger.debug('\n' + stack.pp_stack())
     completed = stack.next_()
     if completed:
       num_completed += 1

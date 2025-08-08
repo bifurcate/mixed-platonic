@@ -47,13 +47,7 @@ def read_state(env_path: Path) -> str:
     state_data = json.load(f)
   return state_data['state']
 
-def generate_config_from_finger_pattern(env_path, finger_pattern):
-  cusp = Cusp()
-  cusp_generator = FingerCuspGenerator(cusp, finger_pattern)
-  cusp = cusp_generator.generate()
-  traversal = list(cusp_generator.traversal())
-  num_tets, num_octs = determine_num_tets_octs(finger_pattern)
-
+def write_config(env_path, num_tets, num_octs, cusp, traversal):
   config_data = {
     'name': env_path.name,
     'num_tets': num_tets,
@@ -66,6 +60,24 @@ def generate_config_from_finger_pattern(env_path, finger_pattern):
 
   with open(config_json_path, 'w', encoding='utf-8') as f:
     json.dump(config_data, f)
+
+def create_env(env_path, num_tets, num_octs, cusp, traversal):
+  try:
+    Path(env_path).mkdir()
+  except FileExistsError:
+    logging.error(f"search environment {env_path.name} already exists")
+    exit(1)
+  write_config(Path(env_path), num_tets, num_octs, cusp, traversal)
+  write_state(Path(env_path), 'init')
+
+def generate_config_from_finger_pattern(env_path, finger_pattern):
+  cusp = Cusp()
+  cusp_generator = FingerCuspGenerator(cusp, finger_pattern)
+  cusp = cusp_generator.generate()
+  traversal = list(cusp_generator.traversal())
+  num_tets, num_octs = determine_num_tets_octs(finger_pattern)
+
+  write_config(env_path, num_tets, num_octs, cusp, traversal)
 
 def generate(env_path: Path, finger_pattern: FingerPattern, debug=False):
   try:
@@ -98,18 +110,7 @@ def generate_config_from_multi_finger_pattern(env_path, multi_finger_pattern):
   traversal = list(cusp_generator.traversal())
   num_tets, num_octs = determine_num_tets_octs(cusp_generator.flattened)
 
-  config_data = {
-    'name': env_path.name,
-    'num_tets': num_tets,
-    'num_octs': num_octs,
-    'cusp': cusp.dump(),
-    'traversal': dump_traversal(traversal)
-  }
-
-  config_json_path = Path(env_path) / "config.json"
-
-  with open(config_json_path, 'w', encoding='utf-8') as f:
-    json.dump(config_data, f)
+  write_config(env_path, num_tets, num_octs, cusp, traversal)
 
 def main():
   
