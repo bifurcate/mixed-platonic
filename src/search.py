@@ -16,6 +16,11 @@ from stack import (
   Stack,
 )
 
+from base import (
+  Sqr,
+  Tri,
+)
+
 DEBUG_REPORT_INTERVAL = 1000
 
 def load_search_config(env_path):
@@ -114,8 +119,6 @@ def search(env_path, debug=False):
   start_time = time.perf_counter()
   num_completed = 0
   while stack.done == False:
-    search_logger.debug(f"iter {stack.counter}")
-    search_logger.debug('\n' + stack.pp_stack())
     completed = stack.next_()
     if completed:
       num_completed += 1

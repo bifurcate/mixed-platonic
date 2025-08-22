@@ -26,7 +26,7 @@ def build_s913(env_path):
   # 1
   cusp.pair(
     Sqr(1), (2, 3), 
-    Tri(0), (1, 3),
+    Tri(1), (1, 3),
   )
 
   # 2

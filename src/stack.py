@@ -317,7 +317,6 @@ class Stack:
         self.entry_type = INDUCED
         self.push_state()
 
-    # breakpoint()
     # next_embedding
     while True:
       init, next_embedding = self.get_next_embedding()
