@@ -15,6 +15,10 @@ from finger_cusp import (
   MultiFingerCuspGenerator,
 )
 
+from long_cusp import (
+  LongCuspGenerator
+)
+
 def parse_finger_pattern_arg(input_fp: str):
   if not all(c in '+-' for c in input_fp):
     raise ValueError("Input finger pattern must consist of '+' and '-' characters")
@@ -79,6 +83,36 @@ def generate_config_from_finger_pattern(env_path, finger_pattern):
 
   write_config(env_path, num_tets, num_octs, cusp, traversal)
 
+def generate_config_from_long_cusp_pattern(env_path, long_cusp_pattern):
+
+  try:
+    Path(env_path).mkdir()
+  except FileExistsError:
+    logging.error(f"search environment {env_path.name} already exists")
+    exit(1)
+
+  cusp = Cusp()
+  cusp_generator = LongCuspGenerator(cusp, long_cusp_pattern)
+  cusp = cusp_generator.generate()
+  traversal = list(cusp_generator.traversal())
+  num_tris, num_sqrs = cusp_generator.get_num_polys()
+  if num_tris % 4 != 0:
+    logging.error(f"num tris must be a multiple of 4")
+    exit(1)
+
+  if num_sqrs % 6 != 0:
+    logging.error(f"num sqrs must be a multiple of 6")
+    exit(1)
+
+  num_tets = num_tris // 4
+  num_octs = num_sqrs // 6
+
+  write_config(env_path, num_tets, num_octs, cusp, traversal)
+
+  write_state(env_path, 'init')
+  logging.info(f"Generated search environment: {env_path.name}")
+
+
 def generate(env_path: Path, finger_pattern: FingerPattern, debug=False):
   try:
     Path(env_path).mkdir()
@@ -128,6 +162,12 @@ def main():
   )
 
   parser.add_argument(
+    '-l', '--long-cusp-pattern',
+    type=str,
+    help="long cusp pattern string" ,
+  )
+
+  parser.add_argument(
     '-d', '--debug-mode',
     action='store_true',
     help="Enable debug mode",
@@ -141,11 +181,14 @@ def main():
 
   args = parser.parse_args()
   debug = args.debug_mode
-  finger_pattern = parse_finger_pattern_arg(args.finger_pattern)
   name = args.name
   env_path = Path(name)
 
-  generate(env_path, finger_pattern, debug)
+  if args.finger_pattern:
+    finger_pattern = parse_finger_pattern_arg(args.finger_pattern)
+    generate(env_path, finger_pattern, debug)
+  elif args.long_cusp_pattern:
+    generate_config_from_long_cusp_pattern(env_path, args.long_cusp_pattern)
 
   
 if __name__ == '__main__':
