@@ -186,6 +186,7 @@ class Stack:
           # Embedding inconsistency!
           return (False, i, proposed_embedding)
     return (True, i, None)
+  
   def get_least_available_cusp_cell_idx(self):
     for idx, cusp_cell in enumerate(self.traversal):
       em = self.construction.embeddings.get_embedding_by_cusp_cell(cusp_cell)
@@ -222,47 +223,14 @@ class Stack:
 
   def rewind(self):
     while True:
+      if len(self.stack) == 0:
+          # done
+          self.done = True
+          break
+      
       self.pop_state()
       if self.entry_type == REGULAR:
         break
-
-  # def next_open_cell(self):
-  #   self.tr_idx = self.get_least_available_cusp_cell_idx()
-  #   self.cusp_cell = self.traversal[self.tr_idx]
-  #   self.embedding = None
-  #   self.entry_type = REGULAR
-
-  # def next_embedding(self):
-  #   embedding = self.get_next_embedding()
-
-  #   if embedding is None:
-  #     self.rewind()
-  #     return
-    
-  #   self.embedding = embedding
-  #   self.entry_type = REGULAR
-  #   self.push_state()
-
-  # def induce(self):
-  #   while True:
-  #     ok, tr_idx, next_embedding = self.get_next_induced()
-  #     if not ok:
-  #       self.rewind()
-  #       break
-
-  #     if next_embedding is not None:
-  #       self.tr_idx = tr_idx
-  #       self.embedding = next_embedding
-  #       self.entry_type = INDUCED
-  #       self.push_state()
-  #     else:
-  #       self.next_open_cell()
-
-  # def next(self):
-  #   while True:
-  #     ok = self.next_embedding()
-  #     if ok:
-  #       self.induce()
 
   def pp_stack(self):
     s = ''
@@ -284,53 +252,37 @@ class Stack:
     # draw_stack([1, -1, 1, -1, 1, -1], self.construction, f"test_boyd_images/{self.counter:08}.png")
 
   def next_(self):
-
-    ## TODO END and COMPLETE conditions
-    # breakpoint()
-    # induce
+    completed = None
     while True:
-      completed = None
+      ok, induced_idx, next_induced_embedding = self.get_next_induced()
 
-      ok, tr_idx, next_embedding = self.get_next_induced()
-
-      if not ok:
-        self.rewind()
+      if not ok or next_induced_embedding is None:
         break
- 
-      if next_embedding is None:
-        # next_open_cell
-        tr_idx = self.get_least_available_cusp_cell_idx()
-        if tr_idx is None:
+
+      self.tr_idx = induced_idx
+      self.embedding = next_induced_embedding
+      self.entry_type = INDUCED
+      self.push_state()
+
+    if ok:
+        next_open_idx = self.get_least_available_cusp_cell_idx()
+        if next_open_idx is None:
           # complete
           completed = self.dump()
-          self.rewind()
-          break
         else:
-          self.tr_idx = tr_idx
-          self.cusp_cell = self.traversal[tr_idx]
+          self.tr_idx = next_open_idx
+          self.cusp_cell = self.traversal[next_open_idx]
           self.embedding = None
-          self.entry_type = REGULAR
-          break
-      else:
-        self.tr_idx = tr_idx ## <--
-        self.embedding = next_embedding
-        self.entry_type = INDUCED
-        self.push_state()
+
+    if not ok or completed:
+      self.rewind()
 
     # next_embedding
     while True:
       init, next_embedding = self.get_next_embedding()
       if next_embedding is None:
         # rewind
-        while True:
-          if len(self.stack) == 0:
-            # done
-            self.done = True
-            break
-
-          self.pop_state()
-          if self.entry_type == REGULAR:
-            break
+        self.rewind()
       else:
         if init:
           self.entry_type = INIT
