@@ -1,0 +1,1 @@
+draw_stack(self.finger_pattern, self.construction,'debug-images/hello.png')

@@ -6,190 +6,200 @@ import json
 import os
 
 from construction import (
-  dump_traversal,
-  Cusp,
+    dump_traversal,
+    Cusp,
 )
 from finger_cusp import (
-  FingerCuspGenerator,
-  FingerPattern,
-  MultiFingerCuspGenerator,
+    FingerCuspGenerator,
+    FingerPattern,
+    MultiFingerCuspGenerator,
 )
 
-from long_cusp import (
-  LongCuspGenerator
-)
+from long_cusp import LongCuspGenerator
+
 
 def parse_finger_pattern_arg(input_fp: str):
-  if not all(c in '+-' for c in input_fp):
-    raise ValueError("Input finger pattern must consist of '+' and '-' characters")
-  
-  if len(input_fp) % 6 != 0:
-    raise ValueError("Input finger pattern length must be divisible by 6")
-  
-  finger_pattern = []
-  for c in input_fp:
-    if c == '+':
-      finger_pattern.append(1)
-    else:
-      finger_pattern.append(-1)
-  return finger_pattern
+    if not all(c in "+-" for c in input_fp):
+        raise ValueError("Input finger pattern must consist of '+' and '-' characters")
+
+    if len(input_fp) % 6 != 0:
+        raise ValueError("Input finger pattern length must be divisible by 6")
+
+    finger_pattern = []
+    for c in input_fp:
+        if c == "+":
+            finger_pattern.append(1)
+        else:
+            finger_pattern.append(-1)
+    return finger_pattern
+
 
 def determine_num_tets_octs(finger_pattern):
-  num_octs = len(finger_pattern) // 6
-  num_tets = 3 * num_octs
-  return num_tets, num_octs
+    num_octs = len(finger_pattern) // 6
+    num_tets = 3 * num_octs
+    return num_tets, num_octs
+
 
 def write_state(env_path: Path, state: str):
-  state_data = {'state': state}
-  state_json_path = Path(env_path) / 'state.json'
-  with open(state_json_path, 'w', encoding='utf-8') as f:
-    json.dump(state_data, f)
+    state_data = {"state": state}
+    state_json_path = Path(env_path) / "state.json"
+    with open(state_json_path, "w", encoding="utf-8") as f:
+        json.dump(state_data, f)
+
 
 def read_state(env_path: Path) -> str:
-  state_json_path = Path(env_path) / 'state.json'
-  with open(state_json_path, 'r') as f:
-    state_data = json.load(f)
-  return state_data['state']
+    state_json_path = Path(env_path) / "state.json"
+    with open(state_json_path, "r") as f:
+        state_data = json.load(f)
+    return state_data["state"]
+
 
 def write_config(env_path, num_tets, num_octs, cusp, traversal):
-  config_data = {
-    'name': env_path.name,
-    'num_tets': num_tets,
-    'num_octs': num_octs,
-    'cusp': cusp.dump(),
-    'traversal': dump_traversal(traversal)
-  }
+    config_data = {
+        "name": env_path.name,
+        "num_tets": num_tets,
+        "num_octs": num_octs,
+        "cusp": cusp.dump(),
+        "traversal": dump_traversal(traversal),
+    }
 
-  config_json_path = Path(env_path) / "config.json"
+    config_json_path = Path(env_path) / "config.json"
 
-  with open(config_json_path, 'w', encoding='utf-8') as f:
-    json.dump(config_data, f)
+    with open(config_json_path, "w", encoding="utf-8") as f:
+        json.dump(config_data, f)
+
 
 def create_env(env_path, num_tets, num_octs, cusp, traversal):
-  try:
-    Path(env_path).mkdir()
-  except FileExistsError:
-    logging.error(f"search environment {env_path.name} already exists")
-    exit(1)
-  write_config(Path(env_path), num_tets, num_octs, cusp, traversal)
-  write_state(Path(env_path), 'init')
+    try:
+        Path(env_path).mkdir()
+    except FileExistsError:
+        logging.error(f"search environment {env_path.name} already exists")
+        exit(1)
+    write_config(Path(env_path), num_tets, num_octs, cusp, traversal)
+    write_state(Path(env_path), "init")
+
 
 def generate_config_from_finger_pattern(env_path, finger_pattern):
-  cusp = Cusp()
-  cusp_generator = FingerCuspGenerator(cusp, finger_pattern)
-  cusp = cusp_generator.generate()
-  traversal = list(cusp_generator.traversal())
-  num_tets, num_octs = determine_num_tets_octs(finger_pattern)
+    cusp = Cusp()
+    cusp_generator = FingerCuspGenerator(cusp, finger_pattern)
+    cusp = cusp_generator.generate()
+    traversal = list(cusp_generator.traversal())
+    num_tets, num_octs = determine_num_tets_octs(finger_pattern)
 
-  write_config(env_path, num_tets, num_octs, cusp, traversal)
+    write_config(env_path, num_tets, num_octs, cusp, traversal)
+
 
 def generate_config_from_long_cusp_pattern(env_path, long_cusp_pattern):
 
-  try:
-    Path(env_path).mkdir()
-  except FileExistsError:
-    logging.error(f"search environment {env_path.name} already exists")
-    exit(1)
+    try:
+        Path(env_path).mkdir()
+    except FileExistsError:
+        logging.error(f"search environment {env_path.name} already exists")
+        exit(1)
 
-  cusp = Cusp()
-  cusp_generator = LongCuspGenerator(cusp, long_cusp_pattern)
-  cusp = cusp_generator.generate()
-  traversal = list(cusp_generator.traversal())
-  num_tris, num_sqrs = cusp_generator.get_num_polys()
-  if num_tris % 4 != 0:
-    logging.error(f"num tris must be a multiple of 4")
-    exit(1)
+    cusp = Cusp()
+    cusp_generator = LongCuspGenerator(cusp, long_cusp_pattern)
+    cusp = cusp_generator.generate()
+    traversal = list(cusp_generator.traversal())
+    num_tris, num_sqrs = cusp_generator.get_num_polys()
+    if num_tris % 4 != 0:
+        logging.error(f"num tris must be a multiple of 4")
+        exit(1)
 
-  if num_sqrs % 6 != 0:
-    logging.error(f"num sqrs must be a multiple of 6")
-    exit(1)
+    if num_sqrs % 6 != 0:
+        logging.error(f"num sqrs must be a multiple of 6")
+        exit(1)
 
-  num_tets = num_tris // 4
-  num_octs = num_sqrs // 6
+    num_tets = num_tris // 4
+    num_octs = num_sqrs // 6
 
-  write_config(env_path, num_tets, num_octs, cusp, traversal)
+    write_config(env_path, num_tets, num_octs, cusp, traversal)
 
-  write_state(env_path, 'init')
-  logging.info(f"Generated search environment: {env_path.name}")
+    write_state(env_path, "init")
+    logging.info(f"Generated search environment: {env_path.name}")
 
 
 def generate(env_path: Path, finger_pattern: FingerPattern, debug=False):
-  try:
-    Path(env_path).mkdir()
-  except FileExistsError:
-    logging.error(f"search environment {env_path.name} already exists")
-    exit(1)
+    try:
+        Path(env_path).mkdir()
+    except FileExistsError:
+        logging.error(f"search environment {env_path.name} already exists")
+        exit(1)
 
-  logging.info(f"Finger Pattern: {finger_pattern}")
-  generate_config_from_finger_pattern(env_path, finger_pattern)
-  write_state(env_path, 'init')
-  logging.info(f"Generated search environment: {env_path.name}")
+    logging.info(f"Finger Pattern: {finger_pattern}")
+    generate_config_from_finger_pattern(env_path, finger_pattern)
+    write_state(env_path, "init")
+    logging.info(f"Generated search environment: {env_path.name}")
+
 
 def generate_multi(env_path: Path, multi_finger_pattern, debug=False):
-  try:
-    Path(env_path).mkdir()
-  except FileExistsError:
-    logging.error(f"search environment {env_path.name} already exists")
-    exit(1)
+    try:
+        Path(env_path).mkdir()
+    except FileExistsError:
+        logging.error(f"search environment {env_path.name} already exists")
+        exit(1)
 
-  logging.info(f"Finger Pattern: {multi_finger_pattern}")
-  generate_config_from_multi_finger_pattern(env_path, multi_finger_pattern)
-  write_state(env_path, 'init')
-  logging.info(f"Generated search environment: {env_path.name}")
+    logging.info(f"Finger Pattern: {multi_finger_pattern}")
+    generate_config_from_multi_finger_pattern(env_path, multi_finger_pattern)
+    write_state(env_path, "init")
+    logging.info(f"Generated search environment: {env_path.name}")
+
 
 def generate_config_from_multi_finger_pattern(env_path, multi_finger_pattern):
-  cusp = Cusp()
-  cusp_generator = MultiFingerCuspGenerator(cusp, multi_finger_pattern)
-  cusp_generator.generate()
-  traversal = list(cusp_generator.traversal())
-  num_tets, num_octs = determine_num_tets_octs(cusp_generator.flattened)
+    cusp = Cusp()
+    cusp_generator = MultiFingerCuspGenerator(cusp, multi_finger_pattern)
+    cusp_generator.generate()
+    traversal = list(cusp_generator.traversal())
+    num_tets, num_octs = determine_num_tets_octs(cusp_generator.flattened)
 
-  write_config(env_path, num_tets, num_octs, cusp, traversal)
+    write_config(env_path, num_tets, num_octs, cusp, traversal)
+
 
 def main():
-  
-  logging.basicConfig(
-    level=logging.DEBUG,
-    format='MP-GENERATE|%(levelname)s: %(message)s',
-  )
 
-  parser = argparse.ArgumentParser(description="CLI frontend for generating Mixed Platonic search environments")
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="MP-GENERATE|%(levelname)s: %(message)s",
+    )
 
-  parser.add_argument(
-    '-f', '--finger-pattern',
-    type=str,
-    help="String of '+' and '-' encoding the finger pattern" 
-  )
+    parser = argparse.ArgumentParser(
+        description="CLI frontend for generating Mixed Platonic search environments"
+    )
 
-  parser.add_argument(
-    '-l', '--long-cusp-pattern',
-    type=str,
-    help="long cusp pattern string" ,
-  )
+    parser.add_argument(
+        "-f",
+        "--finger-pattern",
+        type=str,
+        help="String of '+' and '-' encoding the finger pattern",
+    )
 
-  parser.add_argument(
-    '-d', '--debug-mode',
-    action='store_true',
-    help="Enable debug mode",
-  )
+    parser.add_argument(
+        "-l",
+        "--long-cusp-pattern",
+        type=str,
+        help="long cusp pattern string",
+    )
 
-  parser.add_argument(
-    'name',
-    type=str,
-    help="Name of the search environment"
-  )
+    parser.add_argument(
+        "-d",
+        "--debug-mode",
+        action="store_true",
+        help="Enable debug mode",
+    )
 
-  args = parser.parse_args()
-  debug = args.debug_mode
-  name = args.name
-  env_path = Path(name)
+    parser.add_argument("name", type=str, help="Name of the search environment")
 
-  if args.finger_pattern:
-    finger_pattern = parse_finger_pattern_arg(args.finger_pattern)
-    generate(env_path, finger_pattern, debug)
-  elif args.long_cusp_pattern:
-    generate_config_from_long_cusp_pattern(env_path, args.long_cusp_pattern)
+    args = parser.parse_args()
+    debug = args.debug_mode
+    name = args.name
+    env_path = Path(name)
 
-  
-if __name__ == '__main__':
-  main()
+    if args.finger_pattern:
+        finger_pattern = parse_finger_pattern_arg(args.finger_pattern)
+        generate(env_path, finger_pattern, debug)
+    elif args.long_cusp_pattern:
+        generate_config_from_long_cusp_pattern(env_path, args.long_cusp_pattern)
+
+
+if __name__ == "__main__":
+    main()

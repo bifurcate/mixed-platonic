@@ -1,73 +1,83 @@
 from construction import (
-  Construction,
-  FingerCuspGenerator,
-  Embeddings,
-  Sqr,
-  Tri,
-  Oct,
-  Tet,
-  INIT,
-  CHOICE,
-  INDUCED,
-  OctSqrEmbedding,
-  TetTriEmbedding,
-  stack_to_str,
+    Construction,
+    FingerCuspGenerator,
+    Embeddings,
+    Sqr,
+    Tri,
+    Oct,
+    Tet,
+    INIT,
+    CHOICE,
+    INDUCED,
+    OctSqrEmbedding,
+    TetTriEmbedding,
+    stack_to_str,
 )
 
 from itertools import combinations, product
 
+
 def generate_iterates(num_tets, num_tris, num_octs, num_sqrs):
-  tet_tri_iterates = [ (0,) + x for x in combinations(range(1, num_tris), num_tets - 1) ]
-  oct_sqr_iterates = [ (0,) + x for x in combinations(range(1, num_sqrs), num_octs - 1) ]
-  return product(tet_tri_iterates, oct_sqr_iterates)
+    tet_tri_iterates = [
+        (0,) + x for x in combinations(range(1, num_tris), num_tets - 1)
+    ]
+    oct_sqr_iterates = [
+        (0,) + x for x in combinations(range(1, num_sqrs), num_octs - 1)
+    ]
+    return product(tet_tri_iterates, oct_sqr_iterates)
+
 
 def create_input_stack(tet_indices, oct_indices):
-  input_stack = []
+    input_stack = []
 
-  for tet_idx, tri_idx in enumerate(tet_indices):
-    input_stack.append((TetTriEmbedding(Tet(tet_idx), Tri(tri_idx), (0, 1, 2, 3)), INIT))
+    for tet_idx, tri_idx in enumerate(tet_indices):
+        input_stack.append(
+            (TetTriEmbedding(Tet(tet_idx), Tri(tri_idx), (0, 1, 2, 3)), INIT)
+        )
 
-  for oct_idx, sqr_idx in enumerate(oct_indices):
-    input_stack.append((OctSqrEmbedding(Oct(oct_idx), Sqr(sqr_idx), (0, 1, 2, 3, 4, 5)), INIT))
+    for oct_idx, sqr_idx in enumerate(oct_indices):
+        input_stack.append(
+            (OctSqrEmbedding(Oct(oct_idx), Sqr(sqr_idx), (0, 1, 2, 3, 4, 5)), INIT)
+        )
 
-  return input_stack
+    return input_stack
+
 
 def do_iterate(construction, tet_indices, oct_indices):
-  input_stack = create_input_stack(tet_indices, oct_indices)
-  construction.load_stack(input_stack)
-  for i,_ in enumerate(construction):
-    pass
+    input_stack = create_input_stack(tet_indices, oct_indices)
+    construction.load_stack(input_stack)
+    for i, _ in enumerate(construction):
+        pass
 
-  print(f"num iterations: {i}")
-  print(f"num completed: {len(construction.completed_stacks)}")
-  for c_stack in construction.completed_stacks:
-    print(stack_to_str(c_stack))
+    print(f"num iterations: {i}")
+    print(f"num completed: {len(construction.completed_stacks)}")
+    for c_stack in construction.completed_stacks:
+        print(stack_to_str(c_stack))
 
-  return construction.completed_stacks
+    return construction.completed_stacks
 
 
-if __name__ == '__main__':
-  finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
-  cusp_generator = FingerCuspGenerator(finger_pattern)
-  cusp = cusp_generator.generate()
-  traversal = list(cusp_generator.traversal())
+if __name__ == "__main__":
+    finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
+    cusp_generator = FingerCuspGenerator(finger_pattern)
+    cusp = cusp_generator.generate()
+    traversal = list(cusp_generator.traversal())
 
-  iterates = list(generate_iterates(6, 24, 2, 12))
-  n = len(iterates)
-  completed_stacks = []
+    iterates = list(generate_iterates(6, 24, 2, 12))
+    n = len(iterates)
+    completed_stacks = []
 
-  for i, indices_spec in enumerate(iterates):
-    tet_tri_indices, oct_sqr_indices = indices_spec
-    embeddings = Embeddings()
-    construction = Construction(cusp, embeddings, traversal, num_tets = 6, num_octs = 2)
-    print(f"iterate({i}/{n}): {tet_tri_indices}, {oct_sqr_indices}")
-    completed_stacks_ = do_iterate(construction, tet_tri_indices, oct_sqr_indices)
-    completed_stacks.extend(completed_stacks_)
+    for i, indices_spec in enumerate(iterates):
+        tet_tri_indices, oct_sqr_indices = indices_spec
+        embeddings = Embeddings()
+        construction = Construction(cusp, embeddings, traversal, num_tets=6, num_octs=2)
+        print(f"iterate({i}/{n}): {tet_tri_indices}, {oct_sqr_indices}")
+        completed_stacks_ = do_iterate(construction, tet_tri_indices, oct_sqr_indices)
+        completed_stacks.extend(completed_stacks_)
 
-  print(f"completed_stacks ({len(completed_stacks)})")
-  for c_stack in construction.completed_stacks:
-    print(stack_to_str(c_stack))
-
+    print(f"completed_stacks ({len(completed_stacks)})")
+    for c_stack in construction.completed_stacks:
+        print(stack_to_str(c_stack))
 
 
 # if __name__ == '__main__':
@@ -111,8 +121,6 @@ if __name__ == '__main__':
 #     (TetTriEmbedding(Tet(4), Tri(5), (0, 1, 2, 3)),       INIT),
 #     (TetTriEmbedding(Tet(5), Tri(6), (1, 3, 2, 0)),       INIT),
 #   ]
-
-
 
 
 #   construction.load_stack(input_stack)
@@ -180,7 +188,6 @@ if __name__ == '__main__':
 #     (TetTriEmbedding(Tet(10), Tri(13), (0, 1, 2, 3)),       INIT),
 #     (TetTriEmbedding(Tet(11), Tri(14), (1, 3, 2, 0)),       INIT),
 #   ]
-
 
 
 #   construction.load_stack(input_stack)

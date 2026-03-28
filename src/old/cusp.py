@@ -1,9 +1,10 @@
 import regina
 
+
 def fingered_cellulation():
     cusp = regina.Triangulation2()
-    
-    r_perm = regina.Perm3(1,0,2)
+
+    r_perm = regina.Perm3(1, 0, 2)
     ident_perm = regina.Perm3()
 
     tris = []
@@ -40,7 +41,6 @@ class Finger:
         self.sqr_face_2 = self.cusp.newTriangle()
         self.sqr_face_3 = self.cusp.newTriangle()
 
-
         self.sqr_face_0.join(0, self.sqr_face_1, ident_perm)
         self.sqr_face_1.join(1, self.sqr_face_2, ident_perm)
         self.sqr_face_2.join(0, self.sqr_face_3, ident_perm)
@@ -49,23 +49,22 @@ class Finger:
         ## create triangle A
 
         self.tri_face_A = self.cusp.newTriangle()
-        
+
         self.sqr_face_1.join(2, self.tri_face_A, ident_perm)
-        
+
         ## create triangle B
 
         self.tri_face_B = self.cusp.newTriangle()
-        
+
         self.tri_face_A.join(1, self.tri_face_B, ident_perm)
 
         ## connect the short meridian
 
-        self.tri_face_B.join(0, self.sqr_face_3, regina.Perm3(2,1,0))
+        self.tri_face_B.join(0, self.sqr_face_3, regina.Perm3(2, 1, 0))
 
     def connect(self, finger):
         self.sqr_face_0.join(2, finger.sqr_face_2, regina.Perm3(1, 0, 2))
         self.tri_face_A.join(0, finger.tri_face_B, regina.Perm3(2, 0, 1))
-            
 
 
 class FingeredCellulation:
@@ -85,15 +84,3 @@ class FingeredCellulation:
             prev_finger = current_finger
 
         initial_finger.connect(prev_finger)
-
-
-            
-
-
-
-
-    
-
-        
-
-            

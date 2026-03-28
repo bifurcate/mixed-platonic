@@ -1,7 +1,8 @@
-import regina;
-import itertools;
+import regina
+import itertools
 
 IDENTITY_PERM = regina.Perm4()
+
 
 class MixedPlatonic3:
     def __init__(self, num_octs: int):
@@ -10,8 +11,8 @@ class MixedPlatonic3:
         self.initialize_triangulation()
 
     def initialize_triangulation(self):
-        self.octs = [];
-        self.tets = [];
+        self.octs = []
+        self.tets = []
         self.triangulation = regina.Triangulation3()
 
 
@@ -22,10 +23,10 @@ class PlatonicTetrahedron:
 
     def join_tet(self, self_face_num, other_tet, perm):
         self.tet.join(self_face_num, other_tet.tet, perm)
-    
+
     def join_oct(self, self_face_num, other_oct, other_face_num, perm):
         other_oct.join_tet(other_face_num, self, self_face_num, perm)
-        
+
 
 class PlatonicOctahedron:
     def __init__(self, triangulation: regina.Triangulation3):
@@ -59,7 +60,7 @@ class PlatonicOctahedron:
         self.tets[1].join(2, self.tets[5], IDENTITY_PERM)
         self.tets[2].join(2, self.tets[6], IDENTITY_PERM)
         self.tets[3].join(2, self.tets[7], IDENTITY_PERM)
-        
+
     def join_tet(self, self_face_num, other_tet, perm):
         self_tet = self.tets[self_face_num]
         self_tet.join(0, other_tet.tet, perm)
@@ -68,7 +69,7 @@ class PlatonicOctahedron:
         self_tet = self.tets[self_face_num]
         other_tet = other_oct.tets[other_face_num]
         self_tet.join(0, other_tet, perm)
-    
+
 
 def next_balls_tet(isosig):
     next_sigs = set()
@@ -82,26 +83,27 @@ def next_balls_tet(isosig):
         newTriangulation = regina.Triangulation3(triangulation)
         boundaryTet = newTriangulation.tetrahedron(boundaryTetIdx)
         newTet = newTriangulation.newTetrahedron()
-        
+
         boundaryTet.join(boundaryFace, newTet, IDENTITY_PERM)
         newSig = newTriangulation.isoSig()
         next_sigs.add(newSig)
     return next_sigs
 
+
 def next_balls(isosig, cell_type):
-    
+
     triangulation = regina.Triangulation3(isosig)
 
     n_boundary_components = triangulation.countBoundaryComponents()
 
     if n_boundary_components == 0:
-        if cell_type == 'O':
+        if cell_type == "O":
             PlatonicOctahedron(triangulation)
         else:
             PlatonicTetrahedron(triangulation)
 
         return {triangulation.isoSig()}
-    
+
     next_sigs = set()
 
     assert triangulation.countBoundaryComponents() == 1
@@ -114,20 +116,21 @@ def next_balls(isosig, cell_type):
         newTriangulation = regina.Triangulation3(triangulation)
         boundaryTet = newTriangulation.tetrahedron(boundaryTetIdx)
 
-        if cell_type == 'O':
+        if cell_type == "O":
             newOct = PlatonicOctahedron(newTriangulation)
             newOct.tets[0].join(0, boundaryTet, regina.Perm4(0, boundaryFace))
         else:
             newTet = PlatonicTetrahedron(newTriangulation)
             boundaryTet.join(boundaryFace, newTet.tet, IDENTITY_PERM)
-        
+
         newSig = newTriangulation.isoSig()
         next_sigs.add(newSig)
     return next_sigs
 
+
 def gen_balls_from_type_ordering(cell_types):
     print("processing: " + str(cell_types))
-    current_sig_set = {'a'}  # initial with empty triangulation
+    current_sig_set = {"a"}  # initial with empty triangulation
     for cell_type in cell_types:
         last_sig_set = current_sig_set.copy()
         current_sig_set = set()
@@ -135,13 +138,14 @@ def gen_balls_from_type_ordering(cell_types):
             current_sig_set.update(next_balls(sig, cell_type))
     return current_sig_set
 
+
 def gen_mixed_platonic_balls(num_tets, num_octs):
 
-    type_string = ''
+    type_string = ""
     for i in range(num_tets):
-        type_string += 'T'
+        type_string += "T"
     for i in range(num_octs):
-        type_string += 'O'
+        type_string += "O"
 
     sig_set = set()
     type_orderings = set(itertools.permutations(type_string))
@@ -149,8 +153,3 @@ def gen_mixed_platonic_balls(num_tets, num_octs):
         new_sigs = gen_balls_from_type_ordering(to)
         sig_set.update(new_sigs)
     return sig_set
-
-
-
-        
-
