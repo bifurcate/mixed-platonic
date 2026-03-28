@@ -4,6 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["Nick Jordan <njordan@d.umn.edu>"]
 readme = "README.md"
+packages = [{include = "*.py", from = "src"}]
 
 [tool.poetry.scripts]
 test = "pytest:main"

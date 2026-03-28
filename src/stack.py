@@ -171,10 +171,8 @@ class Stack:
                 self.construction.embeddings.get_embedding_by_cusp_cell(c)
             )
 
-            try:
-                # TODO: capture more info on violation type
-                proposed_embedding = self.construction.get_induced_embedding_for_cell(c)
-            except:
+            violation, proposed_embedding = self.construction.get_induced_embedding_for_cell(c)
+            if violation:
                 return (False, i, None)
 
             if proposed_embedding is None:

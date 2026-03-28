@@ -27,6 +27,12 @@ from base import (
     cusp_half_edge_from_tuple,
 )
 
+CUSP_CELL_MISMATCH = "cusp cell mismatch"
+INCOMPATIBLE_FACE_PAIRING = "incompatible face pairing"
+CUSP_SHAPE_INCOMPATIBLE = "cusp shape incompatible"
+MISSING_SOURCE_EMBEDDING = "missing source embedding"
+DISTINCT_INDUCED_EMBEDDINGS = "distinct induced embeddings"
+
 ## COMPOUND OBJECTS
 
 
@@ -238,15 +244,15 @@ def get_manifold_half_face(
     cusp_half_edge: CuspHalfEdge,
 ):
     if embedding.cusp_cell != cusp_half_edge.cusp_cell:
-        raise ValueError("embedding cusp cell must match cusp half edge cell")
+        return (CUSP_CELL_MISMATCH, None)
 
     domain = (0,) + cusp_half_edge.edge_spec
     face_spec = tuple(sorted(embedding.map.get(i) for i in domain))
 
-    return ManifoldHalfFace(
+    return (None, ManifoldHalfFace(
         embedding.manifold_cell,
         face_spec,
-    )
+    ))
 
 
 def get_embedding_tgt(
@@ -255,22 +261,26 @@ def get_embedding_tgt(
     embedding_src: Embedding,
 ):
 
-    if manifold_face_pairing.half_face_src != get_manifold_half_face(
+    violation, half_face_src = get_manifold_half_face(
         embedding_src, cusp_edge_pairing.half_edge_src
-    ):
-        raise ValueError("incompatible")
+    )
+    if violation:
+        return (violation, None)
+
+    if manifold_face_pairing.half_face_src != half_face_src:
+        return (INCOMPATIBLE_FACE_PAIRING, None)
 
     if (
         cusp_edge_pairing.half_edge_tgt.cusp_cell.is_sqr()
         and manifold_face_pairing.half_face_tgt.manifold_cell.is_tet()
     ):
-        raise ValueError("cusp shape incompatible")
+        return (CUSP_SHAPE_INCOMPATIBLE, None)
 
     if (
         cusp_edge_pairing.half_edge_tgt.cusp_cell.is_tri()
         and manifold_face_pairing.half_face_tgt.manifold_cell.is_oct()
     ):
-        raise ValueError("cusp shape incompatible")
+        return (CUSP_SHAPE_INCOMPATIBLE, None)
 
     half_edge_tgt = cusp_edge_pairing.half_edge_tgt
 
@@ -295,17 +305,17 @@ def get_embedding_tgt(
         )
 
     if cusp_edge_pairing.half_edge_tgt.cusp_cell.is_tri():
-        return TetTriEmbedding(
+        return (None, TetTriEmbedding(
             manifold_face_pairing.half_face_tgt.manifold_cell,
             cusp_edge_pairing.half_edge_tgt.cusp_cell,
             tuple(embedding_spec_tgt),
-        )
+        ))
     else:
-        return OctSqrEmbedding(
+        return (None, OctSqrEmbedding(
             manifold_face_pairing.half_face_tgt.manifold_cell,
             cusp_edge_pairing.half_edge_tgt.cusp_cell,
             tuple(embedding_spec_tgt),
-        )
+        ))
 
 
 # TODO: traversal concept does not need to be in construction. remove and adjust implementation
@@ -369,38 +379,39 @@ class Construction:
         )
 
         if embedding_src is None:
-            raise ValueError("source cusp cell must have embedding")
+            return (MISSING_SOURCE_EMBEDDING, None)
 
         cusp_edge_pairing = self.cusp.get_cell_pairings(
             cusp_half_edge_src.cusp_cell
         ).get(cusp_half_edge_src.edge_spec)
 
         if cusp_edge_pairing is None:
-            return None
+            return (None, None)
 
-        manifold_half_face_src = get_manifold_half_face(
+        violation, manifold_half_face_src = get_manifold_half_face(
             embedding_src,
             cusp_half_edge_src,
         )
+        if violation:
+            return (violation, None)
 
         if manifold_half_face_src is None:
-            return None
+            return (None, None)
 
         manifold_face_pairing = self.find_face_pairing(
             manifold_half_face_src,
         )
 
         if manifold_face_pairing is None:
-            return None
+            return (None, None)
 
-        embedding_tgt = get_embedding_tgt(
+        violation, embedding_tgt = get_embedding_tgt(
             manifold_face_pairing, cusp_edge_pairing, embedding_src
         )
+        if violation:
+            return (violation, None)
 
-        if embedding_tgt is None:
-            return None
-
-        return embedding_tgt
+        return (None, embedding_tgt)
 
     def get_induced_embedding_from_tgt(
         self,
@@ -411,7 +422,7 @@ class Construction:
         )
 
         if cusp_pairing is None:
-            return None
+            return (None, None)
 
         cusp_half_edge_src = cusp_pairing.inv.half_edge_src
         return self.get_induced_embedding_from_src(cusp_half_edge_src)
@@ -435,27 +446,32 @@ class Construction:
             if neighbor_embedding is None:
                 continue
 
-            induced_embedding = self.get_induced_embedding_from_tgt(
+            violation, induced_embedding = self.get_induced_embedding_from_tgt(
                 pairing.half_edge_src
             )
+            if violation:
+                return (violation, None)
             possible_embeddings[e] = induced_embedding
-        return possible_embeddings
+        return (None, possible_embeddings)
 
     def get_induced_embedding_for_cell(self, cusp_cell: CuspCell):
-        possible_embeddings = self.get_induced_embeddings_for_cell(cusp_cell)
+        violation, possible_embeddings = self.get_induced_embeddings_for_cell(cusp_cell)
+        if violation:
+            return (violation, None)
+
         if not possible_embeddings:
-            return None
+            return (None, None)
 
         embedding_values = list(
             e for e in possible_embeddings.values() if e is not None
         )
         if len(embedding_values) == 0:
-            return None
+            return (None, None)
 
         if len(set(embedding_values)) != 1:
-            raise ValueError("distinct induced embeddings")
+            return (DISTINCT_INDUCED_EMBEDDINGS, None)
 
-        return embedding_values[0]
+        return (None, embedding_values[0])
 
     def build_manifold_cellulation(self) -> ManifoldFacePairing:
         # right now this is redundant and adds cell twice for each pair
