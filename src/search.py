@@ -118,19 +118,20 @@ def search(env_path, debug=False):
 
   start_time = time.perf_counter()
   num_completed = 0
-  while stack.done == False:
-    completed = stack.next_()
-    if completed:
-      num_completed += 1
-      write_completed_to_jsonl(env_path, stack.counter, completed)
-      search_logger.info(f"Completion found at iteration {stack.counter}")
-    if debug and stack.counter % DEBUG_REPORT_INTERVAL == 0:
-      check_in_time = time.perf_counter()
-      search_logger.debug(f"iteration: {stack.counter}, completions: {num_completed}, runtime: {(check_in_time - start_time):.6f}s")
+  stack.bar()
+  # while stack.done == False:
+  #   completed = stack.next_()
+  #   if completed:
+  #     num_completed += 1
+  #     write_completed_to_jsonl(env_path, stack.counter, completed)
+  #     search_logger.info(f"Completion found at iteration {stack.counter}")
+  #   if debug and stack.counter % DEBUG_REPORT_INTERVAL == 0:
+  #     check_in_time = time.perf_counter()
+  #     search_logger.debug(f"iteration: {stack.counter}, completions: {num_completed}, runtime: {(check_in_time - start_time):.6f}s")
   end_time = time.perf_counter()
 
   search_logger.info(f"Finish after {stack.counter} iterations in {end_time - start_time:.6f} seconds")
-  search_logger.info(f"{num_completed} completions found")
+  search_logger.info(f"{stack.completed_count} completions found")
 
   write_info_json(env_path, {
     'runtime': end_time - start_time,

@@ -155,6 +155,10 @@ class Embeddings:
       if not d:
         self.verts.pop(embedding.manifold_cell)
 
+  def remove_embedding_by_cusp_cell(self, cusp_cell: CuspCell):
+    em = self.get_embedding_by_cusp_cell(cusp_cell)
+    self.remove_embedding(em)
+
   def is_vert_embedded(self, manifold_cell, vert):
     d = self.verts.get(manifold_cell, None)
     if d is None:

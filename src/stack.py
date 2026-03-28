@@ -15,6 +15,10 @@ from construction import (
   Construction,
 )
 
+from draw import draw_stack
+
+import random
+
 class EmbeddingIterator:
   embedding_type: EmbeddingType = None
   manifold_cell_class = None
@@ -114,6 +118,7 @@ class Stack:
     self.entry_type = None
     self.num_tets = num_tets
     self.num_octs = num_octs
+    self.completed_count = 0
     self.tet_tri_embedding_iterator = TetTriEmbeddingIterator(
       self.construction.embeddings,
       self.num_tets,
@@ -124,21 +129,22 @@ class Stack:
     )
     self.done = False
     self.counter = 0
+    self.finger_pattern = [1,1,-1,-1,1,1,-1,-1,1,1,-1,-1]
     # self.completed = []
     # self.iso_sigs = []
 
-  def get_next_embedding(self):
-    if self.cusp_cell.is_tri():
+  def get_next_embedding(self, cusp_cell, embedding):
+    if cusp_cell.is_tri():
       embedding_class = TetTriEmbedding
       embedding_iterator = self.tet_tri_embedding_iterator
     else:
       embedding_class = OctSqrEmbedding
       embedding_iterator = self.oct_sqr_embedding_iterator
 
-    if self.embedding is None:
+    if embedding is None:
       embedding_iterator.reset()
     else:
-      cell_idx, vert_idx, perm_idx = self.embedding.get_iterator_indices()
+      cell_idx, vert_idx, perm_idx = embedding.get_iterator_indices()
       embedding_iterator.set(cell_idx, vert_idx, perm_idx)
       embedding_iterator.next()
 
@@ -152,7 +158,7 @@ class Stack:
     else:
       next_embedding = embedding_class.from_indices(
         embedding_iterator.cell_idx,
-        self.cusp_cell.cell_index,
+        cusp_cell.cell_index,
         embedding_iterator.vert_idx,
         embedding_iterator.perm_idx,
       )
@@ -250,6 +256,100 @@ class Stack:
     # regina_triangulation = to_regina_triangulation(manifold_cellulation, self.num_tets,self.num_octs)
     # self.iso_sigs.append(regina_triangulation.isoSig())
     # draw_stack([1, -1, 1, -1, 1, -1], self.construction, f"test_boyd_images/{self.counter:08}.png")
+    #
+    #
+    #
+
+
+  def bar(self):
+    tr_idx = self.get_least_available_cusp_cell_idx() # maybe make this return embedding
+    if tr_idx is None:
+      self.completed_count += 1
+      return
+
+    cusp_cell = self.traversal[tr_idx]
+    embedding = self.construction.embeddings.get_embedding_by_cusp_cell(cusp_cell)
+    assert embedding is None
+
+    while True:
+
+      init, next_embedding = self.get_next_embedding(cusp_cell, embedding)
+      if next_embedding is None:
+        return
+
+      embedding = next_embedding
+
+      self.construction.embeddings.add_embedding(embedding)
+
+      self.counter += 1
+      draw_stack(self.finger_pattern, self.construction,f"debug-images/{self.counter}.png")
+
+      induced_embeddings = []
+      while True:
+        ok, _, next_induced_embedding = self.get_next_induced()
+        if not ok or next_induced_embedding is None:
+          break
+        induced_embeddings.append(next_induced_embedding)
+        self.construction.embeddings.add_embedding(next_induced_embedding)
+
+      if ok:
+        self.bar()
+
+      for ie in induced_embeddings:
+        self.construction.embeddings.remove_embedding(ie)
+
+      self.construction.embeddings.remove_embedding(embedding)
+
+
+  def foo(self, tr_idx=0):
+    print(tr_idx)
+
+    # if tr_idx==4:
+    #     breakpoint()
+
+    induced_embeddings = []
+
+    while True:
+      cusp_cell = self.traversal[tr_idx]
+      embedding = self.construction.embeddings.get_embedding_by_cusp_cell(cusp_cell)
+
+      init, next_embedding = self.get_next_embedding(cusp_cell, embedding)
+
+      if next_embedding is None:
+          self.construction.embeddings.remove_embedding_by_cusp_cell(self.traversal[tr_idx])
+          return # iterator done 
+
+      self.construction.embeddings.add_embedding(next_embedding)
+
+      self.counter += 1
+      draw_stack(self.finger_pattern, self.construction,f"debug-images/{self.counter}.png")
+
+      induced_embeddings = []
+      while True:
+          ok, _, next_induced_embedding = self.get_next_induced()
+          if not ok or next_induced_embedding is None:
+              break
+          induced_embeddings.append(next_induced_embedding)
+          self.construction.embeddings.add_embedding(next_induced_embedding)
+
+
+      # rewind
+      if not ok:
+          for ie in induced_embeddings:
+              self.construction.embeddings.remove_embedding(ie)
+          continue
+
+      next_open_idx = self.get_least_available_cusp_cell_idx()
+      if next_open_idx is None:
+          self.completed_count += 1
+          # completed = self.dump()
+          continue
+
+      self.foo(next_open_idx)
+      if init:
+        self.construction.embeddings.remove_embedding_by_cusp_cell(self.traversal[tr_idx])
+        return
+
 
   def next_(self):
     completed = None
