@@ -25,6 +25,7 @@ class EmbeddingIterator:
     def __init__(self, embeddings: Embeddings, num_manifold_cells: int):
         self.embeddings = embeddings
         self.num_manifold_cells = num_manifold_cells
+        self._cells = [self.manifold_cell_class(i) for i in range(num_manifold_cells)]
         self.done = False
         self.cell_idx = 0
         self.vert_idx = 0
@@ -44,7 +45,7 @@ class EmbeddingIterator:
 
     def is_current_vert_embedded(self):
         return self.embeddings.is_vert_embedded(
-            self.manifold_cell_class(self.cell_idx),
+            self._cells[self.cell_idx],
             self.vert_idx,
         )
 

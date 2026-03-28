@@ -143,15 +143,16 @@ class CuspCell:
 
     def __init__(self, cell_index: CuspCellIndex):
         self.cell_index = cell_index
+        self._hash = hash((self.cell_type, self.cell_index))
 
     def __repr__(self):
         return f"{CUSP_CELL_TYPE_LABEL[self.cell_type]}({self.cell_index})"
 
     def __hash__(self):
-        return hash(tuple(self))
+        return self._hash
 
     def __eq__(self, other):
-        return tuple(self) == tuple(other)
+        return self.cell_type == other.cell_type and self.cell_index == other.cell_index
 
     def __iter__(self):
         yield self.cell_type
@@ -220,15 +221,16 @@ class ManifoldCell:
 
     def __init__(self, cell_index: ManifoldCellIndex):
         self.cell_index = cell_index
+        self._hash = hash((self.cell_type, self.cell_index))
 
     def __repr__(self):
         return f"{MANIFOLD_CELL_TYPE_LABEL[self.cell_type]}({self.cell_index})"
 
     def __hash__(self):
-        return hash(tuple(self))
+        return self._hash
 
     def __eq__(self, other):
-        return tuple(self) == tuple(other)
+        return self.cell_type == other.cell_type and self.cell_index == other.cell_index
 
     def __iter__(self):
         yield self.cell_type
@@ -281,6 +283,7 @@ class CuspHalfEdge:
     def __init__(self, cusp_cell: CuspCell, edge_spec: EdgeSpec):
         self.cusp_cell = cusp_cell
         self.edge_spec = edge_spec
+        self._hash = hash((self.cusp_cell._hash, self.edge_spec))
 
     def __iter__(self):
         yield tuple(self.cusp_cell)
@@ -290,16 +293,16 @@ class CuspHalfEdge:
         return f"CuspHalfEdge({repr(self.cusp_cell)}, {repr(self.edge_spec)})"
 
     def __hash__(self):
-        return hash(tuple(self))
+        return self._hash
 
     def __eq__(self, other):
-        return tuple(self) == tuple(other)
+        return self.cusp_cell == other.cusp_cell and self.edge_spec == other.edge_spec
 
 
 def cusp_half_edge_from_tuple(half_edge_tuple):
     return CuspHalfEdge(
         cusp_cell_from_tuple(half_edge_tuple[0]),
-        half_edge_tuple[1],
+        tuple(half_edge_tuple[1]),
     )
 
 
@@ -310,6 +313,7 @@ class ManifoldHalfFace:
     def __init__(self, manifold_cell: ManifoldCell, face_spec: FaceSpec):
         self.manifold_cell = manifold_cell
         self.face_spec = face_spec
+        self._hash = hash((self.manifold_cell._hash, self.face_spec))
 
     def __iter__(self):
         yield tuple(self.manifold_cell)
@@ -319,10 +323,10 @@ class ManifoldHalfFace:
         return f"ManifoldHalfFace({repr(self.manifold_cell)}, {repr(self.face_spec)})"
 
     def __hash__(self):
-        return hash(tuple(self))
+        return self._hash
 
     def __eq__(self, other):
-        return tuple(self) == tuple(other)
+        return self.manifold_cell == other.manifold_cell and self.face_spec == other.face_spec
 
 
 def normalize_edge_pair(edge_spec_source: EdgeSpec, edge_spec_target: EdgeSpec):
@@ -339,6 +343,7 @@ class CuspEdgePairing:
     def __init__(self, half_edge_src: CuspHalfEdge, half_edge_tgt: CuspHalfEdge):
         self.half_edge_src = half_edge_src
         self.half_edge_tgt = half_edge_tgt
+        self._hash = hash((self.half_edge_src._hash, self.half_edge_tgt._hash))
 
     def __iter__(self):
         yield tuple(self.half_edge_src)
@@ -350,10 +355,10 @@ class CuspEdgePairing:
         )
 
     def __hash__(self):
-        return hash(tuple(self))
+        return self._hash
 
     def __eq__(self, other):
-        return tuple(self) == tuple(other)
+        return self.half_edge_src == other.half_edge_src and self.half_edge_tgt == other.half_edge_tgt
 
     @cached_property
     def map(self):
@@ -408,6 +413,7 @@ class ManifoldFacePairing:
     ):
         self.half_face_src = half_face_src
         self.half_face_tgt = half_face_tgt
+        self._hash = hash((self.half_face_src._hash, self.half_face_tgt._hash))
 
     def __iter__(self):
         yield tuple(self.half_face_src)
@@ -417,10 +423,10 @@ class ManifoldFacePairing:
         return f"ManifoldFacePairing({repr(self.half_face_src)}, {repr(self.half_face_tgt)})"
 
     def __hash__(self):
-        return hash(tuple(self))
+        return self._hash
 
     def __eq__(self, other):
-        return tuple(self) == tuple(other)
+        return self.half_face_src == other.half_face_src and self.half_face_tgt == other.half_face_tgt
 
     @cached_property
     def map(self):
@@ -481,6 +487,8 @@ class Embedding:
         if None in embedding_spec:
             self.complete()
 
+        self._hash = hash((self.embedding_type, self.manifold_cell._hash, self.cusp_cell._hash, self.embedding_spec))
+
     def __iter__(self):
         yield self.embedding_type
         yield tuple(self.manifold_cell)
@@ -491,10 +499,13 @@ class Embedding:
         return f"{EMBEDDING_TYPE_LABEL[self.embedding_type]}({repr(self.manifold_cell)}, {repr(self.cusp_cell)}, {repr(self.embedding_spec)})"
 
     def __hash__(self):
-        return hash(tuple(self))
+        return self._hash
 
     def __eq__(self, other):
-        return tuple(self) == tuple(other)
+        return (self.embedding_type == other.embedding_type
+                and self.embedding_spec == other.embedding_spec
+                and self.manifold_cell == other.manifold_cell
+                and self.cusp_cell == other.cusp_cell)
 
     def is_tet_tri(self):
         return self.embedding_type == TET_TRI
@@ -544,7 +555,8 @@ class TetTriEmbedding(Embedding):
         super().__init__(manifold_cell, cusp_cell, embedding_spec)
 
     def exposed(self, face_spec: FaceSpec) -> Optional[EdgeSpec]:
-        indices = sorted((self.embedding_spec.index(i) for i in face_spec))
+        inv = self.inv_map
+        indices = sorted((inv[i] for i in face_spec))
 
         if indices[0] == 0:
             return (indices[1], indices[2])
@@ -589,7 +601,8 @@ class OctSqrEmbedding(Embedding):
         super().__init__(manifold_cell, cusp_cell, embedding_spec)
 
     def exposed(self, face_spec: FaceSpec) -> Optional[EdgeSpec]:
-        indices = sorted((self.embedding_spec.index(i) for i in face_spec))
+        inv = self.inv_map
+        indices = sorted((inv[i] for i in face_spec))
 
         if indices[0] == 0 and indices[2] != 5:
             diff = indices[2] - indices[1]

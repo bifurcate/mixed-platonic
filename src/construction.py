@@ -139,18 +139,11 @@ class Embeddings:
         self.verts = {}
 
     def add_embedding(self, embedding: Embedding):
-        if self.X.get(embedding.manifold_cell) == None:
-            self.X[embedding.manifold_cell] = {}
-
-        self.X[embedding.manifold_cell][embedding.cusp_cell] = embedding
+        m_cell = embedding.manifold_cell
+        self.X.setdefault(m_cell, {})[embedding.cusp_cell] = embedding
         self.Y[embedding.cusp_cell] = embedding
-
-        if self.verts.get(embedding.manifold_cell) is None:
-            self.verts[embedding.manifold_cell] = {}
-
-        # TODO: make vert a method on embedding
         vert = embedding.embedding_spec[0]
-        self.verts[embedding.manifold_cell][vert] = embedding
+        self.verts.setdefault(m_cell, {})[vert] = embedding
 
     def remove_embedding(self, embedding: Embedding):
         d = self.X.get(embedding.manifold_cell)
@@ -173,11 +166,8 @@ class Embeddings:
         self.remove_embedding(em)
 
     def is_vert_embedded(self, manifold_cell, vert):
-        d = self.verts.get(manifold_cell, None)
-        if d is None:
-            return False
-
-        return vert in d.keys()
+        d = self.verts.get(manifold_cell)
+        return d is not None and vert in d
 
     def get_embeddings_by_manifold_cell(
         self, manifold_cell
@@ -351,19 +341,21 @@ class Construction:
     def get_induced_embedding_from_src(
         self,
         cusp_half_edge_src: CuspHalfEdge,
+        embedding_src: Embedding = None,
+        cusp_edge_pairing: CuspEdgePairing = None,
     ):
 
-        embedding_src = self.embeddings.get_embedding_by_cusp_cell(
-            cusp_half_edge_src.cusp_cell
-        )
-
+        if embedding_src is None:
+            embedding_src = self.embeddings.get_embedding_by_cusp_cell(
+                cusp_half_edge_src.cusp_cell
+            )
         if embedding_src is None:
             return (MISSING_SOURCE_EMBEDDING, None)
 
-        cusp_edge_pairing = self.cusp.get_cell_pairings(
-            cusp_half_edge_src.cusp_cell
-        ).get(cusp_half_edge_src.edge_spec)
-
+        if cusp_edge_pairing is None:
+            cusp_edge_pairing = self.cusp.get_cell_pairings(
+                cusp_half_edge_src.cusp_cell
+            ).get(cusp_half_edge_src.edge_spec)
         if cusp_edge_pairing is None:
             return (None, None)
 
@@ -414,12 +406,15 @@ class Construction:
                 continue
 
             neighbor_cell = pairing.half_edge_tgt.cusp_cell
-            if self.embeddings.get_embedding_by_cusp_cell(neighbor_cell) is None:
+            neighbor_embedding = self.embeddings.get_embedding_by_cusp_cell(neighbor_cell)
+            if neighbor_embedding is None:
                 continue
 
-            inv_half_edge = pairing.inv.half_edge_src
+            inv_pairing = pairing.inv
             violation, induced_embedding = self.get_induced_embedding_from_src(
-                inv_half_edge
+                inv_pairing.half_edge_src,
+                embedding_src=neighbor_embedding,
+                cusp_edge_pairing=inv_pairing,
             )
             if violation:
                 return (violation, None)
@@ -437,11 +432,16 @@ class Construction:
                 continue
 
             neighbor_cell = pairing.half_edge_tgt.cusp_cell
-            if self.embeddings.get_embedding_by_cusp_cell(neighbor_cell) is None:
+            neighbor_embedding = self.embeddings.get_embedding_by_cusp_cell(neighbor_cell)
+            if neighbor_embedding is None:
                 continue
 
-            inv_half_edge = pairing.inv.half_edge_src
-            violation, induced = self.get_induced_embedding_from_src(inv_half_edge)
+            inv_pairing = pairing.inv
+            violation, induced = self.get_induced_embedding_from_src(
+                inv_pairing.half_edge_src,
+                embedding_src=neighbor_embedding,
+                cusp_edge_pairing=inv_pairing,
+            )
             if violation:
                 return (violation, None)
             if induced is None:
