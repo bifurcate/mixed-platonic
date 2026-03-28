@@ -171,7 +171,9 @@ class Stack:
                 self.construction.embeddings.get_embedding_by_cusp_cell(c)
             )
 
-            violation, proposed_embedding = self.construction.get_induced_embedding_for_cell(c)
+            violation, proposed_embedding = (
+                self.construction.get_induced_embedding_for_cell(c)
+            )
             if violation:
                 return (False, i, None)
 
@@ -242,7 +244,6 @@ class Stack:
             self.construction.embeddings.add_embedding(embedding)
 
             self.counter += 1
-            # draw_stack(self.finger_pattern, self.construction,f"debug-images/{self.counter}.png")
 
             induced_embeddings = []
             while True:
