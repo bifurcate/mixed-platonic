@@ -1,4 +1,5 @@
 from typing import Optional
+from collections.abc import Iterator
 from functools import cached_property
 
 ### Basic Constants and Data objects
@@ -139,39 +140,43 @@ CuspCellIndex = int
 
 
 class CuspCell:
+    """Base class which represents a single 2-d cusp cell"""
+
     cell_type: CuspCellType = None
 
     def __init__(self, cell_index: CuspCellIndex):
         self.cell_index = cell_index
         self._hash = hash((self.cell_type, self.cell_index))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{CUSP_CELL_TYPE_LABEL[self.cell_type]}({self.cell_index})"
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return self._hash
 
-    def __eq__(self, other):
+    def __eq__(self, other: "CuspCell") -> bool:
         return self.cell_type == other.cell_type and self.cell_index == other.cell_index
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[CuspCellType | CuspCellIndex]:
         yield self.cell_type
         yield self.cell_index
 
-    def is_sqr(self):
+    def is_sqr(self) -> bool:
         return self.cell_type == SQR
 
-    def is_tri(self):
+    def is_tri(self) -> bool:
         return self.cell_type == TRI
 
-    def short_str(self):
+    def short_str(self) -> str:
         return f"{CUSP_CELL_TYPE_SHORT_LABEL[self.cell_type]}[{self.cell_index:2}]"
 
 
 class Triangle(CuspCell):
+    """A triangle 2-d cusp cell, geometrically these are equilateral triangles with side-length one"""
+
     cell_type: CuspCellType = TRI
 
-    def __init__(self, cell_index: CuspCellIndex):
+    def __init__(self, cell_index: CuspCellIndex) -> None:
         super().__init__(cell_index)
 
 
@@ -179,9 +184,11 @@ Tri = Triangle
 
 
 class Square(CuspCell):
+    """A triangle 2-d cusp cell, geometrically these are squares with side-length one"""
+
     cell_type: CuspCellType = SQR
 
-    def __init__(self, cell_index: CuspCellIndex):
+    def __init__(self, cell_index: CuspCellIndex) -> None:
         super().__init__(cell_index)
 
 
@@ -194,7 +201,7 @@ CUSP_CELL_CLASS = {
 }
 
 
-def cusp_cell_from_tuple(cell_tuple):
+def cusp_cell_from_tuple(cell_tuple: tuple[CuspCellType, CuspCellIndex]) -> CuspCell:
     return CUSP_CELL_CLASS[cell_tuple[0]](cell_tuple[1])
 
 
@@ -217,39 +224,43 @@ ManifoldCellIndex = int
 
 
 class ManifoldCell:
+    """Base class representing a regular ideal 3-cell"""
+
     cell_type: ManifoldCellType = None
 
     def __init__(self, cell_index: ManifoldCellIndex):
         self.cell_index = cell_index
         self._hash = hash((self.cell_type, self.cell_index))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{MANIFOLD_CELL_TYPE_LABEL[self.cell_type]}({self.cell_index})"
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return self._hash
 
-    def __eq__(self, other):
+    def __eq__(self, other: "ManifoldCell") -> bool:
         return self.cell_type == other.cell_type and self.cell_index == other.cell_index
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[ManifoldCellType | ManifoldCellIndex]:
         yield self.cell_type
         yield self.cell_index
 
-    def is_tet(self):
+    def is_tet(self) -> bool:
         return self.cell_type == TET
 
-    def is_oct(self):
+    def is_oct(self) -> bool:
         return self.cell_type == OCT
 
-    def short_str(self):
+    def short_str(self) -> str:
         return f"{MANIFOLD_CELL_TYPE_SHORT_LABEL[self.cell_type]}[{self.cell_index}]"
 
 
 class Tetrahedron(ManifoldCell):
+    """A regular ideal Tetrahedron"""
+
     cell_type: ManifoldCellType = TET
 
-    def __init__(self, cell_index: ManifoldCellIndex):
+    def __init__(self, cell_index: ManifoldCellIndex) -> None:
         super().__init__(cell_index)
 
 
@@ -257,9 +268,11 @@ Tet = Tetrahedron
 
 
 class Octahedron(ManifoldCell):
+    """A regular ideal Tetrahedron"""
+
     cell_type: ManifoldCellType = OCT
 
-    def __init__(self, cell_index: ManifoldCellIndex):
+    def __init__(self, cell_index: ManifoldCellIndex) -> None:
         super().__init__(cell_index)
 
 
@@ -272,7 +285,9 @@ MANIFOLD_CELL_CLASS = {
 }
 
 
-def manifold_cell_from_tuple(cell_tuple):
+def manifold_cell_from_tuple(
+    cell_tuple: tuple[ManifoldCellType, ManifoldCellIndex],
+) -> ManifoldCell:
     return MANIFOLD_CELL_CLASS[cell_tuple[0]](cell_tuple[1])
 
 
@@ -280,26 +295,28 @@ EdgeSpec = tuple[int, int]
 
 
 class CuspHalfEdge:
-    def __init__(self, cusp_cell: CuspCell, edge_spec: EdgeSpec):
+    """Represents an edge of a single cusp cell and 'half' an edge in the cusp cellulation"""
+
+    def __init__(self, cusp_cell: CuspCell, edge_spec: EdgeSpec) -> None:
         self.cusp_cell = cusp_cell
         self.edge_spec = edge_spec
         self._hash = hash((self.cusp_cell._hash, self.edge_spec))
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[tuple[int, ...]]:
         yield tuple(self.cusp_cell)
         yield tuple(self.edge_spec)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"CuspHalfEdge({repr(self.cusp_cell)}, {repr(self.edge_spec)})"
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return self._hash
 
-    def __eq__(self, other):
+    def __eq__(self, other: "CuspHalfEdge") -> bool:
         return self.cusp_cell == other.cusp_cell and self.edge_spec == other.edge_spec
 
 
-def cusp_half_edge_from_tuple(half_edge_tuple):
+def cusp_half_edge_from_tuple(half_edge_tuple: tuple) -> CuspHalfEdge:
     return CuspHalfEdge(
         cusp_cell_from_tuple(half_edge_tuple[0]),
         tuple(half_edge_tuple[1]),
@@ -310,26 +327,33 @@ FaceSpec = tuple[int, int, int]
 
 
 class ManifoldHalfFace:
-    def __init__(self, manifold_cell: ManifoldCell, face_spec: FaceSpec):
+    """Represents an face of a single manifold 3-cell and 'half' a face in the Manifold cellulation"""
+
+    def __init__(self, manifold_cell: ManifoldCell, face_spec: FaceSpec) -> None:
         self.manifold_cell = manifold_cell
         self.face_spec = face_spec
         self._hash = hash((self.manifold_cell._hash, self.face_spec))
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[tuple[int, ...]]:
         yield tuple(self.manifold_cell)
         yield tuple(self.face_spec)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"ManifoldHalfFace({repr(self.manifold_cell)}, {repr(self.face_spec)})"
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return self._hash
 
-    def __eq__(self, other):
-        return self.manifold_cell == other.manifold_cell and self.face_spec == other.face_spec
+    def __eq__(self, other: "ManifoldHalfFace") -> bool:
+        return (
+            self.manifold_cell == other.manifold_cell
+            and self.face_spec == other.face_spec
+        )
 
 
-def normalize_edge_pair(edge_spec_source: EdgeSpec, edge_spec_target: EdgeSpec):
+def normalize_edge_pair(
+    edge_spec_source: EdgeSpec, edge_spec_target: EdgeSpec
+) -> tuple[EdgeSpec, EdgeSpec]:
     if edge_spec_source[1] < edge_spec_source[0]:
         return (
             (edge_spec_source[1], edge_spec_source[0]),
@@ -340,28 +364,35 @@ def normalize_edge_pair(edge_spec_source: EdgeSpec, edge_spec_target: EdgeSpec):
 
 
 class CuspEdgePairing:
-    def __init__(self, half_edge_src: CuspHalfEdge, half_edge_tgt: CuspHalfEdge):
+    """A cusp edge pairing associates two cusp-cells in the cusp cellulation along an edge."""
+
+    def __init__(
+        self, half_edge_src: CuspHalfEdge, half_edge_tgt: CuspHalfEdge
+    ) -> None:
         self.half_edge_src = half_edge_src
         self.half_edge_tgt = half_edge_tgt
         self._hash = hash((self.half_edge_src._hash, self.half_edge_tgt._hash))
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[tuple]:
         yield tuple(self.half_edge_src)
         yield tuple(self.half_edge_tgt)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"CuspEdgePairing({repr(self.half_edge_src)}, {repr(self.half_edge_tgt)})"
         )
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return self._hash
 
-    def __eq__(self, other):
-        return self.half_edge_src == other.half_edge_src and self.half_edge_tgt == other.half_edge_tgt
+    def __eq__(self, other: "CuspEdgePairing") -> bool:
+        return (
+            self.half_edge_src == other.half_edge_src
+            and self.half_edge_tgt == other.half_edge_tgt
+        )
 
     @cached_property
-    def map(self):
+    def map(self) -> dict[int, int]:
         return dict(
             zip(
                 (0,) + self.half_edge_src.edge_spec, (0,) + self.half_edge_tgt.edge_spec
@@ -369,7 +400,7 @@ class CuspEdgePairing:
         )
 
     @cached_property
-    def inv(self):
+    def inv(self) -> "CuspEdgePairing":
         inv_cusp_cell_src = self.half_edge_tgt.cusp_cell
         inv_cusp_cell_tgt = self.half_edge_src.cusp_cell
 
@@ -391,14 +422,16 @@ class CuspEdgePairing:
         return CuspEdgePairing(inv_half_edge_src, inv_half_edge_tgt)
 
 
-def cusp_edge_pairing_from_tuple(cusp_edge_pairing_tuple):
+def cusp_edge_pairing_from_tuple(cusp_edge_pairing_tuple: tuple) -> CuspEdgePairing:
     return CuspEdgePairing(
         cusp_half_edge_from_tuple(cusp_edge_pairing_tuple[0]),
         cusp_half_edge_from_tuple(cusp_edge_pairing_tuple[1]),
     )
 
 
-def normalize_face_pair(face_spec_src: FaceSpec, face_spec_tgt: FaceSpec):
+def normalize_face_pair(
+    face_spec_src: FaceSpec, face_spec_tgt: FaceSpec
+) -> tuple[FaceSpec, FaceSpec]:
     sort_indices = [i for i, _ in sorted(enumerate(face_spec_src), key=lambda x: x[1])]
 
     face_spec_src_ordered = tuple(face_spec_src[i] for i in sort_indices)
@@ -408,32 +441,37 @@ def normalize_face_pair(face_spec_src: FaceSpec, face_spec_tgt: FaceSpec):
 
 
 class ManifoldFacePairing:
+    """A Manifold face pairing associates two manifold 3-cells in the manifold cellulation along an face."""
+
     def __init__(
         self, half_face_src: ManifoldHalfFace, half_face_tgt: ManifoldHalfFace
-    ):
+    ) -> None:
         self.half_face_src = half_face_src
         self.half_face_tgt = half_face_tgt
         self._hash = hash((self.half_face_src._hash, self.half_face_tgt._hash))
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[tuple]:
         yield tuple(self.half_face_src)
         yield tuple(self.half_face_tgt)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"ManifoldFacePairing({repr(self.half_face_src)}, {repr(self.half_face_tgt)})"
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return self._hash
 
-    def __eq__(self, other):
-        return self.half_face_src == other.half_face_src and self.half_face_tgt == other.half_face_tgt
+    def __eq__(self, other: "ManifoldFacePairing") -> bool:
+        return (
+            self.half_face_src == other.half_face_src
+            and self.half_face_tgt == other.half_face_tgt
+        )
 
     @cached_property
-    def map(self):
+    def map(self) -> dict[int, int]:
         return dict(zip(self.half_face_src.face_spec, self.half_face_tgt.face_spec))
 
     @cached_property
-    def inv(self):
+    def inv(self) -> "ManifoldFacePairing":
         inv_manifold_cell_src = self.half_face_tgt.manifold_cell
         inv_manifold_cell_tgt = self.half_face_src.manifold_cell
 
@@ -472,6 +510,8 @@ EmbeddingSpec = tuple
 
 
 class Embedding:
+    """An base class representing how a manifold_cell vertex is positioned in the cusp celluation."""
+
     embedding_type: EmbeddingType = None
 
     def __init__(
@@ -479,7 +519,7 @@ class Embedding:
         manifold_cell: ManifoldCell,
         cusp_cell: CuspCell,
         embedding_spec: EmbeddingSpec,
-    ):
+    ) -> None:
         self.manifold_cell = manifold_cell
         self.cusp_cell = cusp_cell
         self.embedding_spec = embedding_spec
@@ -487,42 +527,51 @@ class Embedding:
         if None in embedding_spec:
             self.complete()
 
-        self._hash = hash((self.embedding_type, self.manifold_cell._hash, self.cusp_cell._hash, self.embedding_spec))
+        self._hash = hash(
+            (
+                self.embedding_type,
+                self.manifold_cell._hash,
+                self.cusp_cell._hash,
+                self.embedding_spec,
+            )
+        )
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator:
         yield self.embedding_type
         yield tuple(self.manifold_cell)
         yield tuple(self.cusp_cell)
         yield self.embedding_spec
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{EMBEDDING_TYPE_LABEL[self.embedding_type]}({repr(self.manifold_cell)}, {repr(self.cusp_cell)}, {repr(self.embedding_spec)})"
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return self._hash
 
-    def __eq__(self, other):
-        return (self.embedding_type == other.embedding_type
-                and self.embedding_spec == other.embedding_spec
-                and self.manifold_cell == other.manifold_cell
-                and self.cusp_cell == other.cusp_cell)
+    def __eq__(self, other: "Embedding") -> bool:
+        return (
+            self.embedding_type == other.embedding_type
+            and self.embedding_spec == other.embedding_spec
+            and self.manifold_cell == other.manifold_cell
+            and self.cusp_cell == other.cusp_cell
+        )
 
-    def is_tet_tri(self):
+    def is_tet_tri(self) -> bool:
         return self.embedding_type == TET_TRI
 
-    def is_oct_sqr(self):
+    def is_oct_sqr(self) -> bool:
         return self.embedding_type == OCT_SQR
 
-    def get_iterator_indices(self):
+    def get_iterator_indices(self) -> tuple[int, int, int]:
         vert_idx, perm_idx = self.get_indices()
         return self.manifold_cell.cell_index, vert_idx, perm_idx
 
-    def short_str(self):
+    def short_str(self) -> str:
         em_spec_str = "".join(str(i) for i in self.embedding_spec)
         return f"{self.manifold_cell.short_str()}, {self.cusp_cell.short_str()}, {em_spec_str}"
 
     @cached_property
-    def map(self):
+    def map(self) -> dict[int, int]:
         return dict(
             zip(
                 range(len(self.embedding_spec)),
@@ -531,7 +580,7 @@ class Embedding:
         )
 
     @cached_property
-    def inv_map(self):
+    def inv_map(self) -> dict[int, int]:
         return dict(
             zip(
                 self.embedding_spec,
@@ -551,7 +600,7 @@ class TetTriEmbedding(Embedding):
         manifold_cell: Tetrahedron,
         cusp_cell: Triangle,
         embedding_spec: TetTriEmbeddingSpec,
-    ):
+    ) -> None:
         super().__init__(manifold_cell, cusp_cell, embedding_spec)
 
     def exposed(self, face_spec: FaceSpec) -> Optional[EdgeSpec]:
@@ -563,7 +612,7 @@ class TetTriEmbedding(Embedding):
         else:
             return None
 
-    def complete(self):
+    def complete(self) -> None:
         em = list(self.embedding_spec)
         unknown_idx = -1
         X = [0, 1, 2, 3]
@@ -575,11 +624,13 @@ class TetTriEmbedding(Embedding):
         em[unknown_idx] = X[0]
         self.embedding_spec = tuple(em)
 
-    def get_indices(self):
+    def get_indices(self) -> Optional[tuple[int, int]]:
         return TET_PERM_RV_LU.get(self.embedding_spec)
 
     @classmethod
-    def from_indices(cls, manifold_cell_idx, cusp_cell_idx, vert_idx, perm_idx):
+    def from_indices(
+        cls, manifold_cell_idx: int, cusp_cell_idx: int, vert_idx: int, perm_idx: int
+    ) -> "TetTriEmbedding":
         embedding_spec = TET_PERM_LU.get((vert_idx, perm_idx))
         if embedding_spec is None:
             raise ValueError("invalid indices")
@@ -597,7 +648,7 @@ class OctSqrEmbedding(Embedding):
         manifold_cell: Octahedron,
         cusp_cell: Square,
         embedding_spec: OctSqrEmbeddingSpec,
-    ):
+    ) -> None:
         super().__init__(manifold_cell, cusp_cell, embedding_spec)
 
     def exposed(self, face_spec: FaceSpec) -> Optional[EdgeSpec]:
@@ -611,9 +662,7 @@ class OctSqrEmbedding(Embedding):
         else:
             return None
 
-    def complete(self):
-
-        # TODO: eliminate underfined behaviour
+    def complete(self) -> None:
         em = list(self.embedding_spec)
 
         known_idx = [i for i, v in enumerate(self.embedding_spec) if v is not None]
@@ -623,11 +672,13 @@ class OctSqrEmbedding(Embedding):
                 self.embedding_spec = perm
                 return
 
-    def get_indices(self):
+    def get_indices(self) -> Optional[tuple[int, int]]:
         return OCT_PERM_RV_LU.get(self.embedding_spec)
 
     @classmethod
-    def from_indices(cls, manifold_cell_idx, cusp_cell_idx, vert_idx, perm_idx):
+    def from_indices(
+        cls, manifold_cell_idx: int, cusp_cell_idx: int, vert_idx: int, perm_idx: int
+    ) -> "OctSqrEmbedding":
         embedding_spec = OCT_PERM_LU.get((vert_idx, perm_idx))
         if embedding_spec is None:
             raise ValueError("invalid indices")
@@ -641,7 +692,7 @@ EMBEDDING_CLASS = {
 }
 
 
-def embedding_from_tuple(embedding_tuple):
+def embedding_from_tuple(embedding_tuple: tuple) -> Embedding:
     return EMBEDDING_CLASS[embedding_tuple[0]](
         manifold_cell_from_tuple(embedding_tuple[1]),
         cusp_cell_from_tuple(embedding_tuple[2]),

@@ -33,11 +33,11 @@ DISTINCT_INDUCED_EMBEDDINGS = "distinct induced embeddings"
 
 
 class Cusp:
-    def __init__(self):
-        self.X = {}
-        self.pairs = []
+    def __init__(self) -> None:
+        self.X: dict[CuspCell, dict[EdgeSpec, CuspEdgePairing]] = {}
+        self.pairs: list[CuspEdgePairing] = []
 
-    def add_cell(self, cell: CuspCell):
+    def add_cell(self, cell: CuspCell) -> None:
         self.X[cell] = {}
 
     def pair(
@@ -46,7 +46,7 @@ class Cusp:
         edge_spec_src: EdgeSpec,
         cusp_cell_tgt: CuspCell,
         edge_spec_tgt: EdgeSpec,
-    ):
+    ) -> None:
 
         edge_spec_src, edge_spec_tgt = normalize_edge_pair(edge_spec_src, edge_spec_tgt)
 
@@ -67,13 +67,13 @@ class Cusp:
             self.X[cp.inv.half_edge_src.cusp_cell] = {}
         self.X[cp.inv.half_edge_src.cusp_cell][cp.inv.half_edge_src.edge_spec] = cp.inv
 
-    def get_cell_pairings(self, cusp_cell: CuspCell) -> dict[EdgeSpec, CuspEdgePairing]:
+    def get_cell_pairings(self, cusp_cell: CuspCell) -> dict[EdgeSpec, CuspEdgePairing] | None:
         return self.X.get(cusp_cell)
 
-    def dump(self):
+    def dump(self) -> list[tuple]:
         return [tuple(cp) for cp in self.pairs]
 
-    def load(self, data):
+    def load(self, data: list[tuple]) -> None:
         for pairing in data:
             cp = cusp_edge_pairing_from_tuple(pairing)
             self.pair(
@@ -85,20 +85,20 @@ class Cusp:
 
 
 class ManifoldCellulation:
-    def __init__(self):
-        self.X = {}
-        self.pairs = []
+    def __init__(self) -> None:
+        self.X: dict[ManifoldCell, dict[FaceSpec, ManifoldFacePairing]] = {}
+        self.pairs: list[ManifoldFacePairing] = []
 
-    def add_cell(self, cell: ManifoldCell):
+    def add_cell(self, cell: ManifoldCell) -> None:
         self.X[cell] = {}
 
     def pair(
         self,
         manifold_cell_src: ManifoldCell,
         face_spec_src: FaceSpec,
-        manifold_cell_tgt: CuspCell,
+        manifold_cell_tgt: ManifoldCell,
         face_spec_tgt: FaceSpec,
-    ):
+    ) -> None:
 
         face_spec_src, face_spec_tgt = normalize_face_pair(face_spec_src, face_spec_tgt)
 
@@ -115,33 +115,33 @@ class ManifoldCellulation:
 
     def get_cell_pairings(
         self, manifold_cell: ManifoldCell
-    ) -> dict[FaceSpec, ManifoldFacePairing]:
+    ) -> dict[FaceSpec, ManifoldFacePairing] | None:
         return self.X.get(manifold_cell)
 
 
 # TODO: make traversal a class
-def dump_traversal(traversal):
+def dump_traversal(traversal: list[CuspCell]) -> list[tuple]:
     return [tuple(cell) for cell in traversal]
 
 
-def load_traversal(data):
+def load_traversal(data: list[tuple]) -> list[CuspCell]:
     return [cusp_cell_from_tuple(tuple(cell_tuple)) for cell_tuple in data]
 
 
 class Embeddings:
-    def __init__(self):
-        self.X = {}
-        self.Y = {}
-        self.verts = {}
+    def __init__(self) -> None:
+        self.X: dict[ManifoldCell, dict[CuspCell, Embedding]] = {}
+        self.Y: dict[CuspCell, Embedding] = {}
+        self.verts: dict[ManifoldCell, dict[int, Embedding]] = {}
 
-    def add_embedding(self, embedding: Embedding):
+    def add_embedding(self, embedding: Embedding) -> None:
         m_cell = embedding.manifold_cell
         self.X.setdefault(m_cell, {})[embedding.cusp_cell] = embedding
         self.Y[embedding.cusp_cell] = embedding
         vert = embedding.embedding_spec[0]
         self.verts.setdefault(m_cell, {})[vert] = embedding
 
-    def remove_embedding(self, embedding: Embedding):
+    def remove_embedding(self, embedding: Embedding) -> None:
         d = self.X.get(embedding.manifold_cell)
         if d != None:
             d.pop(embedding.cusp_cell, None)
@@ -157,20 +157,20 @@ class Embeddings:
             if not d:
                 self.verts.pop(embedding.manifold_cell)
 
-    def remove_embedding_by_cusp_cell(self, cusp_cell: CuspCell):
+    def remove_embedding_by_cusp_cell(self, cusp_cell: CuspCell) -> None:
         em = self.get_embedding_by_cusp_cell(cusp_cell)
         self.remove_embedding(em)
 
-    def is_vert_embedded(self, manifold_cell, vert):
+    def is_vert_embedded(self, manifold_cell: ManifoldCell, vert: int) -> bool:
         d = self.verts.get(manifold_cell)
         return d is not None and vert in d
 
     def get_embeddings_by_manifold_cell(
-        self, manifold_cell
-    ) -> dict[CuspCell, Embedding]:
+        self, manifold_cell: ManifoldCell
+    ) -> dict[CuspCell, Embedding] | None:
         return self.X.get(manifold_cell)
 
-    def dump_embeddings_by_manifold_cell(self):
+    def dump_embeddings_by_manifold_cell(self) -> str:
         s = ""
         for m_cell, d in self.X.items():
             s += f"{m_cell.short_str()}\n"
@@ -178,19 +178,19 @@ class Embeddings:
                 s += f"  {c_cell.short_str()}: {em.short_str()}\n"
         return s
 
-    def get_embedding_by_cusp_cell(self, cusp_cell) -> Embedding:
+    def get_embedding_by_cusp_cell(self, cusp_cell: CuspCell) -> Embedding | None:
         return self.Y.get(cusp_cell)
 
-    def dump_embeddings_by_cusp_cell(self):
+    def dump_embeddings_by_cusp_cell(self) -> str:
         s = ""
         for c_cell, em in self.Y.items():
             s += f"  {c_cell.short_str()}: {em.short_str()}\n"
         return s
 
-    def get_embeddings_by_verts(self, manifold_cell) -> dict[int, Embedding]:
+    def get_embeddings_by_verts(self, manifold_cell: ManifoldCell) -> dict[int, Embedding] | None:
         return self.verts.get(manifold_cell)
 
-    def dump_embeddings_by_verts(self):
+    def dump_embeddings_by_verts(self) -> str:
         s = ""
         for m_cell, d in self.verts.items():
             s += f"{m_cell.short_str()}\n"
@@ -198,10 +198,10 @@ class Embeddings:
                 s += f"  {vert_idx}: {em.short_str()}\n"
         return s
 
-    def dump(self):
+    def dump(self) -> list[tuple]:
         return [tuple(em) for em in self.Y.values()]
 
-    def load(self, data):
+    def load(self, data: list[tuple]) -> None:
         for embedding_tuple in data:
             self.add_embedding(embedding_from_tuple(embedding_tuple))
 
@@ -210,7 +210,7 @@ def get_manifold_face_pairing(
     embedding_src: Embedding,
     embedding_tgt: Embedding,
     cusp_pairing: CuspEdgePairing,
-):
+) -> ManifoldFacePairing:
     cusp_half_edge_src = cusp_pairing.half_edge_src
     edge_spec_src = cusp_half_edge_src.edge_spec
 
@@ -231,7 +231,7 @@ def get_manifold_face_pairing(
 def get_manifold_half_face(
     embedding: Embedding,
     cusp_half_edge: CuspHalfEdge,
-):
+) -> tuple[str | None, ManifoldHalfFace | None]:
     if embedding.cusp_cell != cusp_half_edge.cusp_cell:
         return (CUSP_CELL_MISMATCH, None)
 
@@ -251,7 +251,7 @@ def get_embedding_tgt(
     manifold_face_pairing: ManifoldFacePairing,
     cusp_edge_pairing: CuspEdgePairing,
     embedding_src: Embedding,
-):
+) -> tuple[str | None, Embedding | None]:
 
     violation, half_face_src = get_manifold_half_face(
         embedding_src, cusp_edge_pairing.half_edge_src
@@ -304,9 +304,9 @@ class Construction:
         cusp: Cusp,
         embeddings: Embeddings,
         traversal: list[CuspCell] = [],
-        num_tets=6,
-        num_octs=2,
-    ):
+        num_tets: int = 6,
+        num_octs: int = 2,
+    ) -> None:
         self.cusp = cusp
         self.embeddings = embeddings
         self.traversal = traversal
@@ -316,7 +316,7 @@ class Construction:
     def find_face_pairing(
         self,
         manifold_half_face: ManifoldHalfFace,
-    ):
+    ) -> ManifoldFacePairing | None:
         manifold_cell = manifold_half_face.manifold_cell
         face_spec = manifold_half_face.face_spec
 
@@ -346,9 +346,9 @@ class Construction:
     def get_induced_embedding_from_src(
         self,
         cusp_half_edge_src: CuspHalfEdge,
-        embedding_src: Embedding = None,
-        cusp_edge_pairing: CuspEdgePairing = None,
-    ):
+        embedding_src: Embedding | None = None,
+        cusp_edge_pairing: CuspEdgePairing | None = None,
+    ) -> tuple[str | None, Embedding | None]:
 
         if embedding_src is None:
             embedding_src = self.embeddings.get_embedding_by_cusp_cell(
@@ -389,7 +389,7 @@ class Construction:
     def get_induced_embedding_from_tgt(
         self,
         cusp_half_edge_tgt: CuspHalfEdge,
-    ):
+    ) -> tuple[str | None, Embedding | None]:
         cusp_pairing = self.cusp.get_cell_pairings(cusp_half_edge_tgt.cusp_cell).get(
             cusp_half_edge_tgt.edge_spec
         )
@@ -400,7 +400,7 @@ class Construction:
         cusp_half_edge_src = cusp_pairing.inv.half_edge_src
         return self.get_induced_embedding_from_src(cusp_half_edge_src)
 
-    def get_induced_embeddings_for_cell(self, cusp_cell: CuspCell):
+    def get_induced_embeddings_for_cell(self, cusp_cell: CuspCell) -> tuple[str | None, dict[EdgeSpec, Embedding] | None]:
         edges = TRI_EDGES if cusp_cell.is_tri() else SQR_EDGES
 
         possible_embeddings: dict[EdgeSpec, Embedding] = {}
@@ -428,7 +428,7 @@ class Construction:
             possible_embeddings[e] = induced_embedding
         return (None, possible_embeddings)
 
-    def get_induced_embedding_for_cell(self, cusp_cell: CuspCell):
+    def get_induced_embedding_for_cell(self, cusp_cell: CuspCell) -> tuple[str | None, Embedding | None]:
         edges = TRI_EDGES if cusp_cell.is_tri() else SQR_EDGES
         pairings = self.cusp.get_cell_pairings(cusp_cell)
 
@@ -463,7 +463,7 @@ class Construction:
 
         return (None, result)
 
-    def build_manifold_cellulation(self) -> ManifoldFacePairing:
+    def build_manifold_cellulation(self) -> ManifoldCellulation:
         # right now this is redundant and adds cell twice for each pair
         # however it builds the correct object
         mc = ManifoldCellulation()

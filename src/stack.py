@@ -1,6 +1,8 @@
 from base import (
     EmbeddingType,
     Embedding,
+    CuspCell,
+    ManifoldCell,
     TET_TRI,
     OCT_SQR,
     Tetrahedron,
@@ -17,20 +19,20 @@ from construction import (
 
 class EmbeddingIterator:
     embedding_type: EmbeddingType = None
-    manifold_cell_class = None
-    num_verts = 0
-    num_perms = 0
+    manifold_cell_class: type[ManifoldCell] | None = None
+    num_verts: int = 0
+    num_perms: int = 0
 
-    def __init__(self, embeddings: Embeddings, num_manifold_cells: int):
+    def __init__(self, embeddings: Embeddings, num_manifold_cells: int) -> None:
         self.embeddings = embeddings
         self.num_manifold_cells = num_manifold_cells
-        self._cells = [self.manifold_cell_class(i) for i in range(num_manifold_cells)]
-        self.done = False
-        self.cell_idx = 0
-        self.vert_idx = 0
-        self.perm_idx = 0
+        self._cells: list[ManifoldCell] = [self.manifold_cell_class(i) for i in range(num_manifold_cells)]
+        self.done: bool = False
+        self.cell_idx: int = 0
+        self.vert_idx: int = 0
+        self.perm_idx: int = 0
 
-    def set(self, cell_idx, vert_idx, perm_idx):
+    def set(self, cell_idx: int, vert_idx: int, perm_idx: int) -> None:
         self.done = False
         self.cell_idx = cell_idx
         self.vert_idx = vert_idx
@@ -39,16 +41,16 @@ class EmbeddingIterator:
         if self.is_current_vert_embedded():
             self.next()
 
-    def reset(self):
+    def reset(self) -> None:
         self.set(0, 0, 0)
 
-    def is_current_vert_embedded(self):
+    def is_current_vert_embedded(self) -> bool:
         return self.embeddings.is_vert_embedded(
             self._cells[self.cell_idx],
             self.vert_idx,
         )
 
-    def weak_next(self):
+    def weak_next(self) -> "EmbeddingIterator | None":
         if self.perm_idx < self.num_perms - 1:
             self.perm_idx += 1
             return self
@@ -67,7 +69,7 @@ class EmbeddingIterator:
         self.done = True
         return None
 
-    def next(self):
+    def next(self) -> "EmbeddingIterator":
         while True:
             self.weak_next()
             if not self.is_current_vert_embedded() or self.done:
@@ -76,21 +78,21 @@ class EmbeddingIterator:
 
 class TetTriEmbeddingIterator(EmbeddingIterator):
     embedding_type: EmbeddingType = TET_TRI
-    manifold_cell_class = Tetrahedron
-    num_verts = 4
-    num_perms = 6
+    manifold_cell_class: type[Tetrahedron] = Tetrahedron
+    num_verts: int = 4
+    num_perms: int = 6
 
-    def __init__(self, embeddings: Embeddings, num_manifold_cells: int):
+    def __init__(self, embeddings: Embeddings, num_manifold_cells: int) -> None:
         super().__init__(embeddings, num_manifold_cells)
 
 
 class OctSqrEmbeddingIterator(EmbeddingIterator):
     embedding_type: EmbeddingType = OCT_SQR
-    manifold_cell_class = Octahedron
-    num_verts = 6
-    num_perms = 8
+    manifold_cell_class: type[Octahedron] = Octahedron
+    num_verts: int = 6
+    num_perms: int = 8
 
-    def __init__(self, embeddings: Embeddings, num_manifold_cells: int):
+    def __init__(self, embeddings: Embeddings, num_manifold_cells: int) -> None:
         super().__init__(embeddings, num_manifold_cells)
 
 
@@ -108,7 +110,7 @@ EntryType = int
 
 
 class Stack:
-    def __init__(self, traversal, construction: Construction, num_tets, num_octs):
+    def __init__(self, traversal: list[CuspCell], construction: Construction, num_tets: int, num_octs: int) -> None:
         self.construction = construction
         self.traversal = traversal
         self.num_tets = num_tets
@@ -121,10 +123,10 @@ class Stack:
             self.construction.embeddings,
             self.num_octs,
         )
-        self.counter = 0
-        self.completed = []
+        self.counter: int = 0
+        self.completed: list[list[tuple]] = []
 
-    def get_next_embedding(self, cusp_cell, embedding):
+    def get_next_embedding(self, cusp_cell: CuspCell, embedding: Embedding | None) -> tuple[bool, Embedding | None]:
         if cusp_cell.is_tri():
             embedding_class = TetTriEmbedding
             embedding_iterator = self.tet_tri_embedding_iterator
@@ -155,7 +157,7 @@ class Stack:
             )
             return (init, next_embedding)
 
-    def get_next_induced(self) -> tuple[bool, int, Embedding]:
+    def get_next_induced(self) -> tuple[bool, int, Embedding | None]:
         for i, c in enumerate(self.traversal):
             existing_embedding = (
                 self.construction.embeddings.get_embedding_by_cusp_cell(c)
@@ -185,17 +187,17 @@ class Stack:
                     return (False, i, proposed_embedding)
         return (True, i, None)
 
-    def get_least_available_cusp_cell_idx(self):
+    def get_least_available_cusp_cell_idx(self) -> int | None:
         for idx, cusp_cell in enumerate(self.traversal):
             em = self.construction.embeddings.get_embedding_by_cusp_cell(cusp_cell)
             if em is None:
                 return idx
         return None
 
-    def process_completed(self):
+    def process_completed(self) -> None:
         self.completed.append(self.construction.embeddings.dump())
 
-    def run(self):
+    def run(self) -> None:
         tr_idx = (
             self.get_least_available_cusp_cell_idx()
         )  # maybe make this return embedding
