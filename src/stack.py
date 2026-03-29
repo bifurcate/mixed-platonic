@@ -7,7 +7,6 @@ from base import (
     Octahedron,
     TetTriEmbedding,
     OctSqrEmbedding,
-    embedding_from_tuple,
 )
 
 from construction import (
@@ -110,16 +109,10 @@ EntryType = int
 
 class Stack:
     def __init__(self, traversal, construction: Construction, num_tets, num_octs):
-        self.stack = []
         self.construction = construction
         self.traversal = traversal
-        self.tr_idx = None
-        self.cusp_cell = None
-        self.embedding = None
-        self.entry_type = None
         self.num_tets = num_tets
         self.num_octs = num_octs
-        self.completed_count = 0
         self.tet_tri_embedding_iterator = TetTriEmbeddingIterator(
             self.construction.embeddings,
             self.num_tets,
@@ -128,11 +121,8 @@ class Stack:
             self.construction.embeddings,
             self.num_octs,
         )
-        self.done = False
         self.counter = 0
-        self.finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
-        # self.completed = []
-        # self.iso_sigs = []
+        self.completed = []
 
     def get_next_embedding(self, cusp_cell, embedding):
         if cusp_cell.is_tri():
@@ -166,7 +156,6 @@ class Stack:
             return (init, next_embedding)
 
     def get_next_induced(self) -> tuple[bool, int, Embedding]:
-        # TODO: make this more efficient, right now we check everything!
         for i, c in enumerate(self.traversal):
             existing_embedding = (
                 self.construction.embeddings.get_embedding_by_cusp_cell(c)
@@ -203,32 +192,15 @@ class Stack:
                 return idx
         return None
 
-    def load(self, input_stack: list[tuple[int, Embedding]]):
-        for tp, em_tuple in input_stack:
-            em = embedding_from_tuple(em_tuple)
-            self.cusp_cell = em.cusp_cell
-            self.embedding = em
-            self.tr_idx = self.traversal.index(em.cusp_cell)
-            self.entry_type = tp
-            self.push_state()
-
-    def dump(self):
-        output_stack = []
-        for tr_idx, tp in self.stack:
-            cusp_cell = self.traversal[tr_idx]
-            em = self.construction.embeddings.get_embedding_by_cusp_cell(cusp_cell)
-            output_stack.append((tp, tuple(em)))
-        return output_stack
-
-    def pp_state(self):
-        return f"{self.tr_idx: 3},  {ENTRY_TYPE_SHORT_LABELS[self.entry_type]}, {self.embedding.short_str()}\n"
+    def process_completed(self):
+        self.completed.append(self.construction.embeddings.dump())
 
     def run(self):
         tr_idx = (
             self.get_least_available_cusp_cell_idx()
         )  # maybe make this return embedding
         if tr_idx is None:
-            self.completed_count += 1
+            self.process_completed()
             return
 
         cusp_cell = self.traversal[tr_idx]

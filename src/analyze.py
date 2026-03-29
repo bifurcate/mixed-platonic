@@ -1,9 +1,7 @@
 import argparse
 import logging
-import time
 from pathlib import Path
 import json
-import os
 
 from stack import Stack
 
@@ -32,17 +30,15 @@ def completed_stacks(env_path, config):
     with open(completed_file_path, "r") as f:
         for line in f:
             cusp = Cusp()
+            embeddings = Embeddings()
             cusp.load(config["cusp"])
             traversal = load_traversal(config["traversal"])
             num_tets = config["num_tets"]
             num_octs = config["num_octs"]
-            embeddings = Embeddings()
-            construction = Construction(cusp, embeddings)
             completed_entry = json.loads(line)
-            input_stack = completed_entry["completed_stack"]
-            stack = Stack(traversal, construction, num_tets, num_octs)
-            stack.load(input_stack)
-            yield stack
+            embeddings.load(completed_entry["embeddings"])
+            construction = Construction(cusp, embeddings, traversal, num_tets, num_octs)
+            yield construction
 
 
 def main():
@@ -76,8 +72,8 @@ def main():
 
     config = load_search_config(env_path)
 
-    for st in completed_stacks(env_path, config):
-        manifold_cellulation = st.construction.build_manifold_cellulation()
+    for cons in completed_stacks(env_path, config):
+        manifold_cellulation = cons.build_manifold_cellulation()
         regina_triangulation = to_regina_triangulation(
             manifold_cellulation, config["num_tets"], config["num_octs"]
         )

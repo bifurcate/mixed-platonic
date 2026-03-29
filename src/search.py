@@ -33,8 +33,8 @@ def log_config(config):
     logging.info(f"traversal: {config['traversal']}")
 
 
-def write_completed_to_jsonl(env_path, iteration, completed_stack):
-    completed_entry = {"iteration": iteration, "completed_stack": completed_stack}
+def write_completed_to_jsonl(env_path, completion):
+    completed_entry = {"embeddings": completion}
     completed_file_path = Path(env_path) / "out.jsonl"
     with open(completed_file_path, "a") as f:
         f.write(json.dumps(completed_entry) + "\n")
@@ -66,13 +66,6 @@ def search(env_path, debug=False):
     search_logger = logging.getLogger("search_logger")
     search_logger.setLevel(logging.DEBUG)
     log_format = "MP-SEARCH|%(levelname)s: %(message)s"
-
-    # console_handler = logging.StreamHandler(sys.stdout)
-    # console_handler.setLevel(logging.DEBUG)  # or whatever level you want
-    # console_formatter = logging.Formatter(log_format)
-    # console_handler.setFormatter(console_formatter)
-
-    # search_logger.addHandler(console_handler)
 
     if not (env_path.exists() and env_path.is_dir()):
         search_logger.error(
@@ -140,7 +133,10 @@ def search(env_path, debug=False):
     search_logger.info(
         f"Finish after {stack.counter} iterations in {end_time - start_time:.6f} seconds"
     )
-    search_logger.info(f"{stack.completed_count} completions found")
+    search_logger.info(f"{len(stack.completed)} completions found")
+
+    for completion in stack.completed:
+        write_completed_to_jsonl(env_path, completion)
 
     write_info_json(
         env_path,

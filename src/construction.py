@@ -1,14 +1,10 @@
 from base import (
     TRI_EDGES,
     SQR_EDGES,
-    TET_PERMS,
-    OCT_PERMS,
     TET_FACES,
     OCT_FACES,
     Tet,
     Oct,
-    Tri,
-    Sqr,
     CuspCell,
     ManifoldCell,
     EdgeSpec,
@@ -20,11 +16,11 @@ from base import (
     TetTriEmbedding,
     OctSqrEmbedding,
     Embedding,
+    embedding_from_tuple,
     normalize_edge_pair,
     normalize_face_pair,
     cusp_cell_from_tuple,
     cusp_edge_pairing_from_tuple,
-    cusp_half_edge_from_tuple,
 )
 
 CUSP_CELL_MISMATCH = "cusp cell mismatch"
@@ -63,11 +59,11 @@ class Cusp:
 
         # insert in both directions
 
-        if self.X.get(cp.half_edge_src.cusp_cell) == None:
+        if self.X.get(cp.half_edge_src.cusp_cell) is None:
             self.X[cp.half_edge_src.cusp_cell] = {}
         self.X[cp.half_edge_src.cusp_cell][cp.half_edge_src.edge_spec] = cp
 
-        if self.X.get(cp.inv.half_edge_src.cusp_cell) == None:
+        if self.X.get(cp.inv.half_edge_src.cusp_cell) is None:
             self.X[cp.inv.half_edge_src.cusp_cell] = {}
         self.X[cp.inv.half_edge_src.cusp_cell][cp.inv.half_edge_src.edge_spec] = cp.inv
 
@@ -113,9 +109,9 @@ class ManifoldCellulation:
 
         # insert in both directions
         self.X[cp.half_face_src.manifold_cell][cp.half_face_src.face_spec] = cp
-        self.X[cp.inv.half_face_src.manifold_cell][
-            cp.inv.half_face_src.face_spec
-        ] = cp.inv
+        self.X[cp.inv.half_face_src.manifold_cell][cp.inv.half_face_src.face_spec] = (
+            cp.inv
+        )
 
     def get_cell_pairings(
         self, manifold_cell: ManifoldCell
@@ -202,6 +198,13 @@ class Embeddings:
                 s += f"  {vert_idx}: {em.short_str()}\n"
         return s
 
+    def dump(self):
+        return [tuple(em) for em in self.Y.values()]
+
+    def load(self, data):
+        for embedding_tuple in data:
+            self.add_embedding(embedding_from_tuple(embedding_tuple))
+
 
 def get_manifold_face_pairing(
     embedding_src: Embedding,
@@ -209,11 +212,7 @@ def get_manifold_face_pairing(
     cusp_pairing: CuspEdgePairing,
 ):
     cusp_half_edge_src = cusp_pairing.half_edge_src
-    cusp_cell_src = cusp_half_edge_src.cusp_cell
     edge_spec_src = cusp_half_edge_src.edge_spec
-
-    cusp_half_edge_tgt = cusp_pairing.half_edge_tgt
-    cusp_cell_tgt = cusp_half_edge_tgt.cusp_cell
 
     domain = (0,) + edge_spec_src
     face_spec_src = tuple(embedding_src.map.get(i) for i in domain)
@@ -239,10 +238,13 @@ def get_manifold_half_face(
     domain = (0,) + cusp_half_edge.edge_spec
     face_spec = tuple(sorted(embedding.map.get(i) for i in domain))
 
-    return (None, ManifoldHalfFace(
-        embedding.manifold_cell,
-        face_spec,
-    ))
+    return (
+        None,
+        ManifoldHalfFace(
+            embedding.manifold_cell,
+            face_spec,
+        ),
+    )
 
 
 def get_embedding_tgt(
@@ -282,9 +284,15 @@ def get_embedding_tgt(
     cusp_cell_tgt = half_edge_tgt.cusp_cell
 
     if is_tri:
-        return (None, TetTriEmbedding(manifold_cell_tgt, cusp_cell_tgt, embedding_spec_tgt))
+        return (
+            None,
+            TetTriEmbedding(manifold_cell_tgt, cusp_cell_tgt, embedding_spec_tgt),
+        )
     else:
-        return (None, OctSqrEmbedding(manifold_cell_tgt, cusp_cell_tgt, embedding_spec_tgt))
+        return (
+            None,
+            OctSqrEmbedding(manifold_cell_tgt, cusp_cell_tgt, embedding_spec_tgt),
+        )
 
 
 # TODO: traversal concept does not need to be in construction. remove and adjust implementation
@@ -304,9 +312,6 @@ class Construction:
         self.traversal = traversal
         self.num_tets = num_tets
         self.num_octs = num_octs
-        self.stack = []
-        self.exc_state = "init"
-        self.completed_stacks = []
 
     def find_face_pairing(
         self,
@@ -406,7 +411,9 @@ class Construction:
                 continue
 
             neighbor_cell = pairing.half_edge_tgt.cusp_cell
-            neighbor_embedding = self.embeddings.get_embedding_by_cusp_cell(neighbor_cell)
+            neighbor_embedding = self.embeddings.get_embedding_by_cusp_cell(
+                neighbor_cell
+            )
             if neighbor_embedding is None:
                 continue
 
@@ -432,7 +439,9 @@ class Construction:
                 continue
 
             neighbor_cell = pairing.half_edge_tgt.cusp_cell
-            neighbor_embedding = self.embeddings.get_embedding_by_cusp_cell(neighbor_cell)
+            neighbor_embedding = self.embeddings.get_embedding_by_cusp_cell(
+                neighbor_cell
+            )
             if neighbor_embedding is None:
                 continue
 
