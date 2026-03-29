@@ -16,6 +16,7 @@
 .mypy_cache
 
 .venv
+.venv-pypy
 /poetry.toml
 
 ## custom for project
