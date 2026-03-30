@@ -1,3 +1,13 @@
+"""Analyze the status and results of a census run.
+
+Reports aggregate statistics across all environments in a census
+directory: how many are in each lifecycle state (init, exec, done)
+and which completed environments produced valid cellulations.
+
+Usage:
+    poetry run python src/analyze_census.py my_census
+"""
+
 import argparse
 import os
 from pathlib import Path
@@ -6,6 +16,14 @@ from env import read_state, read_info
 
 
 def get_completed(census_path) -> dict:
+    """Find environments that finished with at least one completion.
+
+    Args:
+        census_path: Path to the census root directory.
+
+    Returns:
+        Dict mapping environment name to number of completions.
+    """
 
     completed = {}
     run_env_paths = (
@@ -24,6 +42,14 @@ def get_completed(census_path) -> dict:
 
 
 def get_run_stats(census_path) -> dict:
+    """Count environments in each lifecycle state.
+
+    Args:
+        census_path: Path to the census root directory.
+
+    Returns:
+        Dict with keys: init, exec, done, total.
+    """
 
     num_init = 0
     num_exec = 0
@@ -55,6 +81,7 @@ def get_run_stats(census_path) -> dict:
 
 
 def print_run_stats(run_stats):
+    """Print a summary of environment lifecycle states to stdout."""
     print("## RUN_STATS ##")
     print(f"init: {run_stats['init']}")
     print(f"exec: {run_stats['exec']}")
@@ -65,6 +92,7 @@ def print_run_stats(run_stats):
 
 
 def print_completed(completed):
+    """Print environments that had completions to stdout."""
     print("## FOUND ##")
 
     if not completed:

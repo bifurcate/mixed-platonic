@@ -1,3 +1,17 @@
+"""Run the solver on a single search environment.
+
+Loads a previously generated search environment from disk, runs the
+recursive backtracking solver to find all valid manifold cellulations,
+and writes completions and run metadata back to the environment directory.
+
+The environment must be in the "init" state. On entry the state is set to
+"exec"; on completion it is set to "done". Results are written to out.jsonl
+(one completion per line) and run statistics to info.json.
+
+Usage:
+    poetry run python src/solve.py my_env
+"""
+
 import argparse
 import logging
 import time
@@ -18,7 +32,13 @@ from env import (
     write_completed_to_jsonl,
 )
 
+
 def log_config(config):
+    """Log the search configuration at INFO level.
+
+    Args:
+        config: Config dict as returned by ``read_config``.
+    """
     logging.info(f"name: {config['name']}")
     logging.info(f"num_tets: {config['num_tets']}")
     logging.info(f"num_octs: {config['num_octs']}")
@@ -27,6 +47,16 @@ def log_config(config):
 
 
 def solve(env_path):
+    """Run the solver on a single search environment.
+
+    Loads the config, builds the cusp tiling and construction, runs the
+    solver, and writes all completions and run metadata to disk. Logs
+    are written both to the console and to ``log.txt`` in the environment
+    directory.
+
+    Args:
+        env_path: Path to a search environment directory in "init" state.
+    """
     env_path = Path(env_path)
 
     solve_logger = logging.getLogger("solve_logger")

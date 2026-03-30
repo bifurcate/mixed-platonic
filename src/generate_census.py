@@ -1,3 +1,21 @@
+"""Generate a census of search environments.
+
+Enumerates all distinct cusp patterns of a given size (using bracelet
+enumeration to avoid duplicates under rotation and reflection) and creates
+a search environment for each one under a shared census directory.
+
+Supports three pattern types:
+    - Finger patterns: ``-n <num_fingers>`` enumerates 2-bracelets of
+      the given length.
+    - Multi-component finger patterns: used via ``generate_multi_census``.
+    - Long cusp patterns: ``-l <max_length>`` enumerates long cusp
+      sequences up to the given length.
+
+Usage:
+    poetry run python src/generate_census.py -n 2 my_census
+    poetry run python src/generate_census.py -l 3 my_census
+"""
+
 import argparse
 import logging
 from pathlib import Path
@@ -21,6 +39,12 @@ from long_cusp import build_cusp_sequences
 
 
 def generate_multi_census(census_root, n):
+    """Generate a census from all multi-component 2-bracelets of size n.
+
+    Args:
+        census_root: Path to the census directory to create.
+        n: Number of fingers per component to enumerate.
+    """
 
     try:
         Path(census_root).mkdir()

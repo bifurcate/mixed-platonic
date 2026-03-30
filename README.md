@@ -66,10 +66,10 @@ poetry run python src/generate.py -l "a" my_search
 
 This creates a directory (`my_search/`) containing `config.json` and `state.json`.
 
-### 2. Run the search
+### 2. Run the solver
 
 ```sh
-poetry run python src/search.py my_search
+poetry run python src/solve.py my_search
 ```
 
 Solutions are written to `my_search/out.jsonl`, one per line.
@@ -82,6 +82,25 @@ Extract Regina isomorphism signatures from completed solutions:
 poetry run python src/analyze.py -i my_search
 ```
 
+### Census workflow
+
+A census automates the generate-solve-analyze pipeline across all distinct
+cusp patterns of a given size:
+
+```sh
+# Generate all finger-pattern environments with 2 fingers
+poetry run python src/generate_census.py -n 2 my_census
+
+# Solve all environments (run multiple workers in parallel)
+poetry run python src/solve_census.py my_census
+
+# Report census status and list environments with completions
+poetry run python src/analyze_census.py my_census
+```
+
+Multiple `solve_census.py` workers can run concurrently against the same
+census directory — a file-based claiming protocol prevents duplicated work.
+
 ### Visualization
 
 The `draw.py` module can render cusp tilings with embedding annotations using pycairo.
@@ -90,24 +109,27 @@ The `draw.py` module can render cusp tilings with embedding annotations using py
 
 ```
 src/
-  base.py             Core data structures (cells, pairings, embeddings)
-  construction.py     Cusp tiling, embedding collection, constraint propagation
-  solver.py           Recursive backtracking search algorithm
-  finger_cusp.py      Finger pattern cusp generator
-  long_cusp.py        Long cusp pattern generator
-  generate.py         CLI: create search environments
-  search.py           CLI: run the solver
-  analyze.py          CLI: extract results
-  export_regina.py    Convert cellulations to Regina triangulations
-  draw.py             Cusp visualization (pycairo)
-  bracelets.py        Bracelet enumeration for pattern generation
-  examples.py         Example cusp configurations
-  worker.py           Distributed search worker
+  base.py              Core data structures (cells, pairings, embeddings)
+  construction.py      Cusp tiling, embedding collection, constraint propagation
+  solver.py            Recursive backtracking search algorithm
+  finger_cusp.py       Finger pattern cusp generator
+  long_cusp.py         Long cusp pattern generator
+  env.py               Search environment I/O (config, state, results)
+  generate.py          CLI: create a single search environment
+  generate_census.py   CLI: create environments for all patterns of a given size
+  solve.py             CLI: run the solver on a single environment
+  solve_census.py      CLI: distributed worker that solves a census
+  analyze.py           CLI: extract Regina isomorphism signatures
+  analyze_census.py    CLI: report census status and completions
+  export_regina.py     Convert cellulations to Regina triangulations
+  draw.py              Cusp visualization (pycairo)
+  bracelets.py         Bracelet enumeration for pattern generation
+  examples.py          Example cusp configurations
 tests/
-  test_base.py        Tests for core data structures
+  test_base.py         Tests for core data structures
   test_construction.py Tests for construction and constraint propagation
-  test_finger_cusp.py Tests for finger pattern generation
-  test_long_cusp.py   Tests for long cusp pattern generation
+  test_finger_cusp.py  Tests for finger pattern generation
+  test_long_cusp.py    Tests for long cusp pattern generation
 ```
 
 ## Testing

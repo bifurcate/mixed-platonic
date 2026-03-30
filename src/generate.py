@@ -1,3 +1,15 @@
+"""Generate search environments from cusp patterns.
+
+Creates a search environment directory for a single cusp tiling. The cusp
+pattern can be specified as a finger pattern (string of '+' and '-') or a
+long cusp pattern string. The environment is written to disk and left in
+the "init" state, ready for the solver.
+
+Usage:
+    poetry run python src/generate.py -f "+-+-+-+-+-+-" my_env
+    poetry run python src/generate.py -l "a" my_env
+"""
+
 import argparse
 import logging
 from pathlib import Path
@@ -17,6 +29,19 @@ from env import (
 
 
 def parse_finger_pattern_arg(input_fp: str):
+    """Parse a CLI finger pattern string into a list of +1/-1 values.
+
+    Args:
+        input_fp: String of '+' and '-' characters. Length must be
+            divisible by 6 (each group of 6 encodes one octahedron).
+
+    Returns:
+        List of integers (+1 or -1).
+
+    Raises:
+        ValueError: If the string contains invalid characters or has
+            a length not divisible by 6.
+    """
     if not all(c in "+-" for c in input_fp):
         raise ValueError("Input finger pattern must consist of '+' and '-' characters")
 
@@ -33,12 +58,32 @@ def parse_finger_pattern_arg(input_fp: str):
 
 
 def determine_num_tets_octs(finger_pattern):
+    """Compute the number of tetrahedra and octahedra from a finger pattern.
+
+    Each group of 6 entries in the pattern corresponds to one octahedron
+    and three tetrahedra.
+
+    Args:
+        finger_pattern: List of +1/-1 values.
+
+    Returns:
+        Tuple of (num_tets, num_octs).
+    """
     num_octs = len(finger_pattern) // 6
     num_tets = 3 * num_octs
     return num_tets, num_octs
 
 
 def generate_config_from_finger_pattern(env_path, finger_pattern):
+    """Build cusp tiling from a finger pattern and write config.json.
+
+    The environment directory must already exist. This writes only the
+    config; the caller is responsible for setting the state.
+
+    Args:
+        env_path: Path to the environment directory.
+        finger_pattern: List of +1/-1 values encoding the finger pattern.
+    """
     cusp = Cusp()
     cusp_generator = FingerCuspGenerator(cusp, finger_pattern)
     cusp = cusp_generator.generate()
@@ -49,6 +94,16 @@ def generate_config_from_finger_pattern(env_path, finger_pattern):
 
 
 def generate_config_from_long_cusp_pattern(env_path, long_cusp_pattern):
+    """Create a search environment from a long cusp pattern string.
+
+    Creates the environment directory, builds the cusp tiling, validates
+    that the polygon counts are compatible with whole cell counts, and
+    writes config and state.
+
+    Args:
+        env_path: Path to the environment directory to create.
+        long_cusp_pattern: Long cusp pattern string (e.g. "a", "ab").
+    """
     create_env_dir(env_path)
 
     cusp = Cusp()
@@ -73,6 +128,12 @@ def generate_config_from_long_cusp_pattern(env_path, long_cusp_pattern):
 
 
 def generate(env_path: Path, finger_pattern: FingerPattern):
+    """Create a search environment from a single finger pattern.
+
+    Args:
+        env_path: Path to the environment directory to create.
+        finger_pattern: List of +1/-1 values encoding the finger pattern.
+    """
     create_env_dir(env_path)
 
     logging.info(f"Finger Pattern: {finger_pattern}")
@@ -82,6 +143,13 @@ def generate(env_path: Path, finger_pattern: FingerPattern):
 
 
 def generate_multi(env_path: Path, multi_finger_pattern):
+    """Create a search environment from a multi-component finger pattern.
+
+    Args:
+        env_path: Path to the environment directory to create.
+        multi_finger_pattern: List of finger patterns, one per cusp
+            component.
+    """
     create_env_dir(env_path)
 
     logging.info(f"Finger Pattern: {multi_finger_pattern}")
@@ -91,6 +159,15 @@ def generate_multi(env_path: Path, multi_finger_pattern):
 
 
 def generate_config_from_multi_finger_pattern(env_path, multi_finger_pattern):
+    """Build cusp tiling from a multi-component finger pattern and write config.
+
+    The environment directory must already exist. This writes only the
+    config; the caller is responsible for setting the state.
+
+    Args:
+        env_path: Path to the environment directory.
+        multi_finger_pattern: List of finger patterns, one per component.
+    """
     cusp = Cusp()
     cusp_generator = MultiFingerCuspGenerator(cusp, multi_finger_pattern)
     cusp_generator.generate()

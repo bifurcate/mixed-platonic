@@ -1,3 +1,14 @@
+"""Analyze completed solver results for a single search environment.
+
+Loads completions from out.jsonl, reconstructs the manifold cellulation
+for each, and exports Regina isomorphism signatures. These signatures
+are canonical identifiers that can be used to look up manifolds in
+existing censuses or compare results across runs.
+
+Usage:
+    poetry run python src/analyze.py -i my_env
+"""
+
 import argparse
 import json
 import logging
@@ -14,6 +25,19 @@ from env import read_config
 
 
 def completed_stacks(env_path, config):
+    """Yield reconstructed Construction objects from completed solver output.
+
+    Reads each line of out.jsonl, deserializes the embedding data, and
+    rebuilds the full Construction (cusp + embeddings + traversal) so
+    that the caller can build manifold cellulations from it.
+
+    Args:
+        env_path: Path to the search environment directory.
+        config: Config dict as returned by ``read_config``.
+
+    Yields:
+        Construction objects, one per completed embedding.
+    """
     completed_file_path = Path(env_path) / "out.jsonl"
     if not completed_file_path.exists():
         logging.error(f"no completed output exists")
