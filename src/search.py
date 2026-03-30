@@ -11,8 +11,8 @@ from construction import (
     Construction,
 )
 
-from stack import (
-    Stack,
+from solver import (
+    Solver,
 )
 
 DEBUG_REPORT_INTERVAL = 1000
@@ -114,35 +114,35 @@ def search(env_path, debug=False):
 
     embeddings = Embeddings()
     construction = Construction(cusp, embeddings)
-    stack = Stack(traversal, construction, num_tets, num_octs)
+    solver = Solver(traversal, construction, num_tets, num_octs)
 
     start_time = time.perf_counter()
     num_completed = 0
-    stack.run()
-    # while stack.done == False:
-    #   completed = stack.next_()
+    solver.run()
+    # while solver.done == False:
+    #   completed = solver.next_()
     #   if completed:
     #     num_completed += 1
-    #     write_completed_to_jsonl(env_path, stack.counter, completed)
-    #     search_logger.info(f"Completion found at iteration {stack.counter}")
-    #   if debug and stack.counter % DEBUG_REPORT_INTERVAL == 0:
+    #     write_completed_to_jsonl(env_path, solver.counter, completed)
+    #     search_logger.info(f"Completion found at iteration {solver.counter}")
+    #   if debug and solver.counter % DEBUG_REPORT_INTERVAL == 0:
     #     check_in_time = time.perf_counter()
-    #     search_logger.debug(f"iteration: {stack.counter}, completions: {num_completed}, runtime: {(check_in_time - start_time):.6f}s")
+    #     search_logger.debug(f"iteration: {solver.counter}, completions: {num_completed}, runtime: {(check_in_time - start_time):.6f}s")
     end_time = time.perf_counter()
 
     search_logger.info(
-        f"Finish after {stack.counter} iterations in {end_time - start_time:.6f} seconds"
+        f"Finish after {solver.counter} iterations in {end_time - start_time:.6f} seconds"
     )
-    search_logger.info(f"{len(stack.completed)} completions found")
+    search_logger.info(f"{len(solver.completed)} completions found")
 
-    for completion in stack.completed:
+    for completion in solver.completed:
         write_completed_to_jsonl(env_path, completion)
 
     write_info_json(
         env_path,
         {
             "runtime": end_time - start_time,
-            "iterations": stack.counter,
+            "iterations": solver.counter,
             "num_completed": num_completed,
         },
     )

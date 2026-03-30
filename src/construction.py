@@ -17,7 +17,7 @@ The key algorithmic idea: an edge shared by two cusp cells corresponds to
 a face shared by two manifold 3-cells. Given an embedding on one side of a
 cusp edge, the cusp edge pairing and the manifold face pairing together
 determine (induce) the embedding on the other side. The search algorithm
-(in ``stack.py``) places embeddings one by one, propagating induced
+(in ``solver.py``) places embeddings one by one, propagating induced
 constraints via the methods here, and backtracks when contradictions arise.
 """
 from base import (

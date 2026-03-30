@@ -196,7 +196,7 @@ ENTRY_TYPE_SHORT_LABELS = {
 EntryType = int
 
 
-class Stack:
+class Solver:
     """Recursive backtracking search engine for cusp completion.
 
     Drives the search for valid embedding assignments over all cusp cells.

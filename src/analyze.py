@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 import json
 
-from stack import Stack
+from solver import Solver
 
 from construction import (
     load_traversal,

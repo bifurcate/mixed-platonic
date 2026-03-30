@@ -15,8 +15,8 @@ from construction import (
   Construction,
 )
 
-from stack import (
-  Stack,
+from solver import (
+  Solver,
   INIT,
   REGULAR,
   INDUCED,
