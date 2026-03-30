@@ -54,13 +54,6 @@ def main():
         "-l", "--long-cusp", type=int, help="Maximum length of long cusp pattern"
     )
 
-    parser.add_argument(
-        "-d",
-        "--debug-mode",
-        action="store_true",
-        help="Enable debug mode",
-    )
-
     parser.add_argument("name", type=str, help="Name of the search environment")
 
     args = parser.parse_args()

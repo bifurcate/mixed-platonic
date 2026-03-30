@@ -18,9 +18,6 @@ from env import (
     write_completed_to_jsonl,
 )
 
-DEBUG_REPORT_INTERVAL = 1000
-
-
 def log_config(config):
     logging.info(f"name: {config['name']}")
     logging.info(f"num_tets: {config['num_tets']}")
@@ -29,7 +26,7 @@ def log_config(config):
     logging.info(f"traversal: {config['traversal']}")
 
 
-def solve(env_path, debug=False):
+def solve(env_path):
     env_path = Path(env_path)
 
     solve_logger = logging.getLogger("solve_logger")
@@ -65,11 +62,6 @@ def solve(env_path, debug=False):
         solve_logger.error(f"config file for '{env_path.name}' does not exist")
 
     log_config(config)
-
-    if debug:
-        config["debug"] = True
-    else:
-        config["debug"] = False
 
     cusp = Cusp()
     cusp.load(config["cusp"])
@@ -118,21 +110,13 @@ def main():
         description="CLI frontend for running the Mixed Platonic solver"
     )
 
-    parser.add_argument(
-        "-d",
-        "--debug-mode",
-        action="store_true",
-        help="Enable debug mode",
-    )
-
     parser.add_argument("name", type=str, help="Name of the search environment")
 
     args = parser.parse_args()
-    debug = args.debug_mode
     name = args.name
     env_path = Path(name)
 
-    solve(env_path, debug)
+    solve(env_path)
 
 
 if __name__ == "__main__":

@@ -38,7 +38,7 @@ def claim_dir(census_dir) -> Path:
 
 def process(work_dir: Path):
     print(f"[{os.getpid()}] Working on {work_dir}", flush=True)
-    solve(work_dir, debug=False)
+    solve(work_dir)
     mark_done(work_dir)
     print(f"[{os.getpid()}] Finished {work_dir}", flush=True)
 
@@ -50,13 +50,6 @@ def main():
     )
 
     parser.add_argument(
-        "-d",
-        "--debug-mode",
-        action="store_true",
-        help="Enable debug mode",
-    )
-
-    parser.add_argument(
         "census_dir",
         nargs="?",
         default=".",
@@ -65,7 +58,6 @@ def main():
     )
 
     args = parser.parse_args()
-    debug = args.debug_mode
     census_dir = Path(args.census_dir)
 
     while True:
@@ -74,7 +66,7 @@ def main():
             print(f"[{os.getpid()}] No more work, exiting", flush=True)
             break
         print(f"[{os.getpid()}] Working on {work_dir}", flush=True)
-        solve(work_dir, debug=debug)
+        solve(work_dir)
         mark_done(work_dir)
         print(f"[{os.getpid()}] Finished {work_dir}", flush=True)
 

@@ -81,13 +81,6 @@ def main():
     )
 
     parser.add_argument(
-        "-d",
-        "--debug-mode",
-        action="store_true",
-        help="Enable debug mode",
-    )
-
-    parser.add_argument(
         "-r",
         "--run-stats",
         action="store_true",
@@ -97,7 +90,6 @@ def main():
     parser.add_argument("name", type=str, help="Name of the search environment")
 
     args = parser.parse_args()
-    debug = args.debug_mode
     census_name = args.name
     census_path = Path(census_name)
 

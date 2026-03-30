@@ -72,7 +72,7 @@ def generate_config_from_long_cusp_pattern(env_path, long_cusp_pattern):
     logging.info(f"Generated search environment: {env_path.name}")
 
 
-def generate(env_path: Path, finger_pattern: FingerPattern, debug=False):
+def generate(env_path: Path, finger_pattern: FingerPattern):
     create_env_dir(env_path)
 
     logging.info(f"Finger Pattern: {finger_pattern}")
@@ -81,7 +81,7 @@ def generate(env_path: Path, finger_pattern: FingerPattern, debug=False):
     logging.info(f"Generated search environment: {env_path.name}")
 
 
-def generate_multi(env_path: Path, multi_finger_pattern, debug=False):
+def generate_multi(env_path: Path, multi_finger_pattern):
     create_env_dir(env_path)
 
     logging.info(f"Finger Pattern: {multi_finger_pattern}")
@@ -124,23 +124,15 @@ def main():
         help="long cusp pattern string",
     )
 
-    parser.add_argument(
-        "-d",
-        "--debug-mode",
-        action="store_true",
-        help="Enable debug mode",
-    )
-
     parser.add_argument("name", type=str, help="Name of the search environment")
 
     args = parser.parse_args()
-    debug = args.debug_mode
     name = args.name
     env_path = Path(name)
 
     if args.finger_pattern:
         finger_pattern = parse_finger_pattern_arg(args.finger_pattern)
-        generate(env_path, finger_pattern, debug)
+        generate(env_path, finger_pattern)
     elif args.long_cusp_pattern:
         generate_config_from_long_cusp_pattern(env_path, args.long_cusp_pattern)
 
