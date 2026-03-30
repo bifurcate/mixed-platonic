@@ -6,8 +6,8 @@ long cusp pattern string. The environment is written to disk and left in
 the "init" state, ready for the solver.
 
 Usage:
-    poetry run python src/generate.py -f "+-+-+-+-+-+-" my_env
-    poetry run python src/generate.py -l "a" my_env
+    poetry run python src/generate.py -f '++--++--++--' my_env
+    poetry run python src/generate.py -l 'ebdcebdccc' my_env
 """
 
 import argparse

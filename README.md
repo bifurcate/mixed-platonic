@@ -88,8 +88,8 @@ A census automates the generate-solve-analyze pipeline across all distinct
 cusp patterns of a given size:
 
 ```sh
-# Generate all finger-pattern environments with 2 fingers
-poetry run python src/generate_census.py -n 2 my_census
+# Generate all finger-pattern environments with 12 fingers
+poetry run python src/generate_census.py -n 12 my_census
 
 # Solve all environments (run multiple workers in parallel)
 poetry run python src/solve_census.py my_census
@@ -136,7 +136,12 @@ tests/
 
 ```sh
 poetry run pytest tests/
+
 ```
+## TODO
+
+- Fix up and add more tests
+- Document and clean up cusp generating dependencies
 
 ## Author
 
