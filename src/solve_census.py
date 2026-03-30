@@ -2,7 +2,7 @@ import os
 import argparse
 from pathlib import Path
 
-from search import search
+from solve import solve
 
 CLAIM_FILE = ".claimed"
 DONE_FILE = ".done"
@@ -38,9 +38,7 @@ def claim_dir(census_dir) -> Path:
 
 def process(work_dir: Path):
     print(f"[{os.getpid()}] Working on {work_dir}", flush=True)
-    # --- simulate work ---
-    search(work_dir, debug=False)
-    # -------------------
+    solve(work_dir, debug=False)
     mark_done(work_dir)
     print(f"[{os.getpid()}] Finished {work_dir}", flush=True)
 
@@ -48,7 +46,7 @@ def process(work_dir: Path):
 def main():
 
     parser = argparse.ArgumentParser(
-        description="CLI frontend for executing Mixed Platonic censuses"
+        description="CLI frontend for solving Mixed Platonic censuses"
     )
 
     parser.add_argument(
@@ -76,7 +74,7 @@ def main():
             print(f"[{os.getpid()}] No more work, exiting", flush=True)
             break
         print(f"[{os.getpid()}] Working on {work_dir}", flush=True)
-        search(work_dir, debug=debug)
+        solve(work_dir, debug=debug)
         mark_done(work_dir)
         print(f"[{os.getpid()}] Finished {work_dir}", flush=True)
 

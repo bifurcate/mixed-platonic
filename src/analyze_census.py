@@ -1,24 +1,8 @@
 import argparse
 import os
 from pathlib import Path
-import json
 
-
-def read_state(env_path: Path) -> str:
-    state_json_path = Path(env_path) / "state.json"
-    with open(state_json_path, "r") as f:
-        state_data = json.load(f)
-    return state_data["state"]
-
-
-def read_info(env_path: Path) -> str:
-    info_json_path = Path(env_path) / "info.json"
-    try:
-        with open(info_json_path, "r") as f:
-            info_data = json.load(f)
-    except FileNotFoundError:
-        return {}
-    return info_data
+from env import read_state, read_info
 
 
 def get_completed(census_path) -> dict:

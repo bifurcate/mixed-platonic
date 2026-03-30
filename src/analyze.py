@@ -1,9 +1,7 @@
 import argparse
+import json
 import logging
 from pathlib import Path
-import json
-
-from solver import Solver
 
 from construction import (
     load_traversal,
@@ -11,15 +9,8 @@ from construction import (
     Embeddings,
     Construction,
 )
-
 from export_regina import to_regina_triangulation
-
-
-def load_search_config(env_path):
-    config_file_path = env_path / "config.json"
-    with open(config_file_path, "r") as f:
-        search_config = json.load(f)
-    return search_config
+from env import read_config
 
 
 def completed_stacks(env_path, config):
@@ -70,7 +61,7 @@ def main():
             f"search environment '{name}' does not exist, use generate to create"
         )
 
-    config = load_search_config(env_path)
+    config = read_config(env_path)
 
     for cons in completed_stacks(env_path, config):
         manifold_cellulation = cons.build_manifold_cellulation()
