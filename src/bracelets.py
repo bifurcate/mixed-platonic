@@ -1,5 +1,6 @@
 from itertools import (
     product,
+    combinations,
     combinations_with_replacement,
 )
 
@@ -25,17 +26,58 @@ def all_reflections(seq):
     return all_rotations(seq) + all_rotations(reflected)
 
 
-# note this is a bit different from general bracelets in that
-# we also have an inversion symmetry
 def equivalence_class(seq):
     inverted_seq = invert(seq)
     return set(all_reflections(seq) + all_reflections(inverted_seq))
+
+
+def balanced_strings(n):
+    if n % 2 != 0:
+        return []
+
+    k = n // 2
+    result = []
+
+    for plus_positions in combinations(range(n), k):
+        s = [-1] * n
+        for i in plus_positions:
+            s[i] = 1
+        result.append(tuple(s))
+
+    return result
+
+
+def integrate_string(seq, c):
+    int_seq = [1]
+    n = len(seq)
+    for i in range(len(seq)):
+        if seq[i] == seq[(i + 1) % n]:
+            int_seq.append(c)
+
+
+def generate_balanced_bracelets(n: int):
+    """Yield all distinct bracelets of length n over 2 colors."""
+    for seq in balanced_strings(n):
+        if is_canonical(seq):
+            yield tuple(int(x) for x in seq)
+
+
+def reduce_to_bracelets(X):
+    for x in X:
+        if is_canonical(x):
+            yield x
 
 
 def is_canonical(seq):
     """Return True if seq is the lexicographically smallest of its bracelet class."""
     candidates = equivalence_class(seq)
     return seq == max(candidates)
+
+
+def to_canonical(seq):
+    """Return True if seq is the lexicographically smallest of its bracelet class."""
+    candidates = equivalence_class(seq)
+    return max(candidates)
 
 
 def generate_2_bracelets(n: int):
