@@ -1,6 +1,26 @@
-"""Tools and classes for produces cusp cellulations for the 'short meridian'"""
+"""Cusp cellulation generators for the short-meridian (finger) case.
+
+In the short-meridian family, each cusp tiling is built from repeating
+"finger" units arranged cyclically.  A single finger consists of one
+square and two triangles, glued internally along three edges::
+
+    Sqr(i) -- Tri(2i) -- Tri(2i+1) -- (back to Sqr(i))
+
+Adjacent fingers are connected by two edge pairings whose topology depends
+on whether consecutive entries in the finger pattern have the same or
+opposite sign (+1 / -1).  The sign encodes the orientation of the finger
+relative to its neighbours.
+
+A ``FingerPattern`` is a cyclic list of +1/-1 values, one per finger.
+The ``FingerCuspGenerator`` builds a single connected cusp component from
+one pattern, while ``MultiFingerCuspGenerator`` handles the multi-cusp
+case by concatenating several patterns with an index offset.
+"""
+
+from collections.abc import Iterator
 
 from base import (
+    CuspCell,
     Sqr,
     Tri,
 )
@@ -8,9 +28,18 @@ from base import (
 from construction import Cusp
 
 FingerPattern = list[int]
+"""A cyclic sequence of +1/-1 values encoding finger orientations."""
 
 
-def to_finger_pattern_str(finger_pattern: FingerPattern):
+def to_finger_pattern_str(finger_pattern: FingerPattern) -> str:
+    """Encode a finger pattern as a compact string of ``+`` and ``-`` chars.
+
+    Args:
+        finger_pattern: List of +1/-1 values.
+
+    Returns:
+        A string like ``"++--+"`` of the same length.
+    """
     s = ""
     for x in finger_pattern:
         if x == -1:
@@ -20,8 +49,16 @@ def to_finger_pattern_str(finger_pattern: FingerPattern):
     return s
 
 
-def to_finger_pattern_list(finger_pattern_str):
-    L = []
+def to_finger_pattern_list(finger_pattern_str: str) -> FingerPattern:
+    """Decode a ``+``/``-`` string back into a finger pattern list.
+
+    Args:
+        finger_pattern_str: A string of ``+`` and ``-`` characters.
+
+    Returns:
+        List of +1/-1 integers.
+    """
+    L: FingerPattern = []
     for x in finger_pattern_str:
         if x == "-":
             L.append(-1)
@@ -30,7 +67,19 @@ def to_finger_pattern_list(finger_pattern_str):
     return L
 
 
-def to_multi_finger_pattern_str(multi_finger_pattern):
+def to_multi_finger_pattern_str(multi_finger_pattern: list[FingerPattern]) -> str:
+    """Encode a multi-cusp finger pattern as a pipe-delimited string.
+
+    Each component's pattern is separated by ``|`` delimiters, e.g.
+    ``"|++--|-+|"`` for two components with patterns [+1,+1,-1,-1]
+    and [-1,+1].
+
+    Args:
+        multi_finger_pattern: List of finger patterns, one per cusp component.
+
+    Returns:
+        Pipe-delimited string representation.
+    """
     s = ""
     for fp in multi_finger_pattern:
         s += "|"
@@ -44,16 +93,39 @@ def to_multi_finger_pattern_str(multi_finger_pattern):
 
 
 class FingerCuspGenerator:
-    def __init__(self, cusp: Cusp, finger_pattern: FingerPattern):
+    """Build a single connected cusp tiling from a cyclic finger pattern.
+
+    Each finger at index *i* creates three cusp cells — ``Sqr(i)``,
+    ``Tri(2i)``, ``Tri(2i+1)`` — with internal edge pairings that form a
+    strip.  Adjacent fingers are then connected with two more edge pairings
+    whose topology depends on whether the neighbouring pattern entries share
+    the same sign ("positive" connection) or differ ("negative" connection).
+    The last finger wraps around to connect with the first.
+
+    Attributes:
+        cusp: The cusp tiling being populated.
+        finger_pattern: Cyclic list of +1/-1 orientation values.
+    """
+
+    def __init__(self, cusp: Cusp, finger_pattern: FingerPattern) -> None:
         self.cusp = cusp
         self.finger_pattern = finger_pattern
-        self.current_idx = 0
+        self.current_idx: int = 0
 
-    def add_finger(self, idx):
+    def add_finger(self, idx: int) -> None:
+        """Create the three cusp cells for finger *idx* and pair them internally.
+
+        Builds the internal strip ``Sqr(idx) -- Tri(2*idx) -- Tri(2*idx+1)``
+        with three edge pairings forming a closed band around the finger.
+
+        Args:
+            idx: Zero-based finger index.
+        """
         sqr0 = Sqr(idx)
         tri0 = Tri(2 * idx)
         tri1 = Tri(2 * idx + 1)
 
+        # Sqr right edge <-> Tri0 left edge
         self.cusp.pair(
             sqr0,
             (2, 3),
@@ -61,6 +133,7 @@ class FingerCuspGenerator:
             (1, 3),
         )
 
+        # Tri0 bottom edge <-> Tri1 top edge
         self.cusp.pair(
             tri0,
             (2, 3),
@@ -68,6 +141,7 @@ class FingerCuspGenerator:
             (2, 1),
         )
 
+        # Tri1 bottom edge <-> Sqr left edge (wraps the strip)
         self.cusp.pair(
             tri1,
             (2, 3),
@@ -75,7 +149,18 @@ class FingerCuspGenerator:
             (1, 4),
         )
 
-    def connect_fingers_pos(self, idx_src, idx_tgt):
+    def connect_fingers_pos(self, idx_src: int, idx_tgt: int) -> None:
+        """Connect two same-sign fingers with square-to-square and tri-to-tri pairings.
+
+        Used when ``finger_pattern[idx_src]`` and ``finger_pattern[idx_tgt]``
+        have the same sign.  The right side of finger *idx_src* is paired
+        directly to the left side of finger *idx_tgt*: square-to-square on
+        the top edge and triangle-to-triangle on the bottom edge.
+
+        Args:
+            idx_src: Index of the source (left) finger.
+            idx_tgt: Index of the target (right) finger.
+        """
         self.cusp.pair(
             Sqr(idx_src),
             (3, 4),
@@ -85,7 +170,17 @@ class FingerCuspGenerator:
 
         self.cusp.pair(Tri(2 * idx_src + 1), (1, 3), Tri(2 * idx_tgt), (1, 2))
 
-    def connect_fingers_neg(self, idx_src, idx_tgt):
+    def connect_fingers_neg(self, idx_src: int, idx_tgt: int) -> None:
+        """Connect two opposite-sign fingers with crossed square-tri pairings.
+
+        Used when ``finger_pattern[idx_src]`` and ``finger_pattern[idx_tgt]``
+        differ in sign.  The connection crosses cell types: the source square
+        pairs with the target triangle, and vice versa.
+
+        Args:
+            idx_src: Index of the source (left) finger.
+            idx_tgt: Index of the target (right) finger.
+        """
         self.cusp.pair(
             Sqr(idx_src),
             (3, 4),
@@ -101,16 +196,27 @@ class FingerCuspGenerator:
         )
 
     def generate(self) -> Cusp:
+        """Build the complete cusp tiling by adding and connecting all fingers.
+
+        First creates all finger strips, then connects consecutive pairs
+        (including the wrap-around from last to first) using positive or
+        negative connections according to the pattern.
+
+        Returns:
+            The populated ``Cusp`` object with all cells and edge pairings.
+        """
         n = len(self.finger_pattern)
         for i in range(n):
             self.add_finger(i)
 
+        # Connect consecutive fingers
         for i in range(n - 1):
             if self.finger_pattern[i] == self.finger_pattern[i + 1]:
                 self.connect_fingers_pos(i, i + 1)
             else:
                 self.connect_fingers_neg(i, i + 1)
 
+        # Wrap-around: connect last finger back to first
         if self.finger_pattern[n - 1] == self.finger_pattern[0]:
             self.connect_fingers_pos(n - 1, 0)
         else:
@@ -118,7 +224,13 @@ class FingerCuspGenerator:
 
         return self.cusp
 
-    def traversal(self):
+    def traversal(self) -> Iterator[CuspCell]:
+        """Yield all cusp cells in finger order: Sqr, Tri, Tri per finger.
+
+        Yields:
+            Each cusp cell in the tiling, three per finger, in the order
+            ``Sqr(i), Tri(2i), Tri(2i+1)`` for ``i = 0, 1, ..., n-1``.
+        """
         for i in range(len(self.finger_pattern)):
             yield Sqr(i)
             yield Tri(2 * i)
@@ -126,12 +238,34 @@ class FingerCuspGenerator:
 
 
 class MultiFingerCuspGenerator:
-    def __init__(self, cusp, multi_finger_pattern: list[FingerPattern]):
+    """Build a (possibly disconnected) multi-cusp tiling from several finger patterns.
+
+    Each finger pattern in the list produces one connected cusp component.
+    Cell indices are offset so that components don't collide: if the first
+    pattern has *k* fingers, the second component's cells start at index *k*.
+
+    Attributes:
+        cusp: The cusp tiling being populated (may contain multiple components).
+        multi_finger_pattern: List of finger patterns, one per cusp component.
+        flattened: All finger entries concatenated, used for index calculations.
+    """
+
+    def __init__(self, cusp: Cusp, multi_finger_pattern: list[FingerPattern]) -> None:
         self.cusp = cusp
         self.multi_finger_pattern = multi_finger_pattern
-        self.flattened = [item for fp in multi_finger_pattern for item in fp]
+        self.flattened: FingerPattern = [
+            item for fp in multi_finger_pattern for item in fp
+        ]
 
-    def add_finger(self, idx):
+    def add_finger(self, idx: int) -> None:
+        """Create the three cusp cells for finger *idx* and pair them internally.
+
+        Identical to ``FingerCuspGenerator.add_finger``; the *idx* value
+        includes the component offset so cell indices are globally unique.
+
+        Args:
+            idx: Global (offset-adjusted) finger index.
+        """
         sqr0 = Sqr(idx)
         tri0 = Tri(2 * idx)
         tri1 = Tri(2 * idx + 1)
@@ -157,7 +291,13 @@ class MultiFingerCuspGenerator:
             (1, 4),
         )
 
-    def connect_fingers_pos(self, idx_src, idx_tgt):
+    def connect_fingers_pos(self, idx_src: int, idx_tgt: int) -> None:
+        """Connect two same-sign fingers (square-to-square, tri-to-tri).
+
+        Args:
+            idx_src: Global index of the source finger.
+            idx_tgt: Global index of the target finger.
+        """
         self.cusp.pair(
             Sqr(idx_src),
             (3, 4),
@@ -167,7 +307,13 @@ class MultiFingerCuspGenerator:
 
         self.cusp.pair(Tri(2 * idx_src + 1), (1, 3), Tri(2 * idx_tgt), (1, 2))
 
-    def connect_fingers_neg(self, idx_src, idx_tgt):
+    def connect_fingers_neg(self, idx_src: int, idx_tgt: int) -> None:
+        """Connect two opposite-sign fingers (crossed square-tri).
+
+        Args:
+            idx_src: Global index of the source finger.
+            idx_tgt: Global index of the target finger.
+        """
         self.cusp.pair(
             Sqr(idx_src),
             (3, 4),
@@ -182,7 +328,17 @@ class MultiFingerCuspGenerator:
             (2, 1),
         )
 
-    def add_component(self, finger_pattern, offset):
+    def add_component(self, finger_pattern: FingerPattern, offset: int) -> None:
+        """Build one connected cusp component at the given index offset.
+
+        Creates all fingers, connects consecutive pairs (including the
+        wrap-around), using positive or negative connections as determined
+        by the pattern.
+
+        Args:
+            finger_pattern: The +1/-1 pattern for this component.
+            offset: Starting cell index for this component's fingers.
+        """
         n = len(finger_pattern)
 
         for i in range(n):
@@ -200,12 +356,28 @@ class MultiFingerCuspGenerator:
             self.connect_fingers_neg(offset + n - 1, offset)
 
     def generate(self) -> Cusp:
+        """Build the complete multi-cusp tiling from all component patterns.
+
+        Iterates through each finger pattern, advancing the offset by the
+        pattern length so that cell indices don't overlap between components.
+
+        Returns:
+            The populated ``Cusp`` object with all components.
+        """
         offset = 0
         for fp in self.multi_finger_pattern:
             self.add_component(fp, offset)
             offset += len(fp)
 
-    def traversal(self):
+        return self.cusp
+
+    def traversal(self) -> Iterator[CuspCell]:
+        """Yield all cusp cells across all components in finger order.
+
+        Yields:
+            Each cusp cell in the tiling, three per finger, ordered by
+            global finger index.
+        """
         for i in range(len(self.flattened)):
             yield Sqr(i)
             yield Tri(2 * i)

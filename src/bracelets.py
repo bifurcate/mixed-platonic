@@ -1,42 +1,94 @@
+"""Bracelet and necklace enumeration for binary (±1) cyclic sequences.
+
+A *necklace* is an equivalence class of sequences under cyclic rotation.
+A *bracelet* is an equivalence class under both rotation and reflection.
+In this module, sequences additionally identify +s with −s (sign
+inversion), so the full equivalence class of a sequence includes all
+rotations and reflections of both the sequence and its negation.
+
+The primary use case is enumerating distinct finger patterns for cusp
+cellulations: each finger pattern is a cyclic ±1 sequence, and two
+patterns are equivalent if one can be obtained from the other by rotation,
+reflection, or global sign flip.
+
+Public API:
+    - ``generate_2_bracelets(n)`` — all bracelets of length *n* over {+1, −1}
+    - ``generate_multi_2_bracelets(n)`` — multi-component bracelets that
+      partition *n* into components of size ≥ 2
+    - ``is_canonical(seq)`` / ``to_canonical(seq)`` — canonical representative
+      selection within bracelet equivalence classes
+    - ``reduce_to_bracelets(X)`` — filter an iterable to canonical representatives
+"""
+
+from collections.abc import Iterator
 from itertools import (
     product,
     combinations,
     combinations_with_replacement,
 )
 
+# A binary sequence is a tuple of +1/−1 values representing a cyclic pattern.
+BinarySeq = tuple[int, ...]
 
-def flatten_1(nested_tuple):
+
+def flatten_once(nested_tuple: tuple[tuple[int, ...], ...]) -> tuple[int, ...]:
+    """Flatten one level of nesting, concatenating inner tuples.
+
+    Args:
+        nested_tuple: A tuple of tuples.
+
+    Returns:
+        A single tuple with all inner elements concatenated in order.
+    """
     return tuple(item for sub in nested_tuple for item in sub)
 
 
-def rotate(seq, i):
+def rotate(seq: BinarySeq, i: int) -> BinarySeq:
+    """Rotate *seq* left by *i* positions."""
     return seq[i:] + seq[:i]
 
 
-def invert(seq):
+def negate(seq: BinarySeq) -> BinarySeq:
+    """Return the element-wise sign negation of *seq* (+1 ↔ −1)."""
     return tuple(-x for x in seq)
 
 
-def all_rotations(seq):
+def all_rotations(seq: BinarySeq) -> list[BinarySeq]:
+    """Return all cyclic rotations of *seq*."""
     return [rotate(seq, i) for i in range(len(seq))]
 
 
-def all_reflections(seq):
+def all_reflections(seq: BinarySeq) -> list[BinarySeq]:
+    """Return all rotations of *seq* and of its reversal (2n total)."""
     reflected = seq[::-1]
     return all_rotations(seq) + all_rotations(reflected)
 
 
-def equivalence_class(seq):
-    inverted_seq = invert(seq)
-    return set(all_reflections(seq) + all_reflections(inverted_seq))
+def equivalence_class(seq: BinarySeq) -> set[BinarySeq]:
+    """Return the full bracelet equivalence class of *seq*.
+
+    Includes all rotations and reflections of both *seq* and its negation,
+    giving the orbit under the dihedral group combined with sign inversion.
+    """
+    negated = negate(seq)
+    return set(all_reflections(seq) + all_reflections(negated))
 
 
-def balanced_strings(n):
+def balanced_sequences(n: int) -> list[BinarySeq]:
+    """Generate all ±1 sequences of length *n* with equal counts of +1 and −1.
+
+    Args:
+        n: Sequence length; must be even.
+
+    Returns:
+        List of all balanced sequences (n/2 entries of each sign), or an
+        empty list if *n* is odd.
+    """
     if n % 2 != 0:
         return []
 
     k = n // 2
-    result = []
+    result: list[BinarySeq] = []
 
     for plus_positions in combinations(range(n), k):
         s = [-1] * n
@@ -47,7 +99,19 @@ def balanced_strings(n):
     return result
 
 
-def integrate_string(seq, c):
+def integrate_string(seq: BinarySeq, c: int) -> list[int]:
+    """Compute a discrete integral of *seq* with initial value 1.
+
+    Appends *c* at each position where consecutive entries (cyclically)
+    have the same sign.
+
+    Args:
+        seq: A ±1 binary sequence.
+        c: Value to append when adjacent entries agree.
+
+    Returns:
+        The integrated sequence.
+    """
     int_seq = [1]
     n = len(seq)
     for i in range(len(seq)):
@@ -55,60 +119,121 @@ def integrate_string(seq, c):
             int_seq.append(c)
 
 
-def generate_balanced_bracelets(n: int):
-    """Yield all distinct bracelets of length n over 2 colors."""
-    for seq in balanced_strings(n):
-        if is_canonical(seq):
-            yield tuple(int(x) for x in seq)
+def is_canonical(seq: BinarySeq) -> bool:
+    """Return True if *seq* is the canonical (lexicographically largest) representative.
+
+    The canonical representative is the lexicographic maximum over the full
+    bracelet equivalence class (rotations, reflections, and sign negation).
+    """
+    candidates = equivalence_class(seq)
+    return seq == max(candidates)
 
 
-def reduce_to_bracelets(X):
+def to_canonical(seq: BinarySeq) -> BinarySeq:
+    """Return the canonical (lexicographically largest) representative of *seq*'s bracelet class.
+
+    Args:
+        seq: Any ±1 binary sequence.
+
+    Returns:
+        The lexicographically largest sequence in the equivalence class.
+    """
+    candidates = equivalence_class(seq)
+    return max(candidates)
+
+
+def reduce_to_bracelets(X: Iterator[BinarySeq]) -> Iterator[BinarySeq]:
+    """Filter an iterable of sequences, yielding only canonical representatives.
+
+    Args:
+        X: Iterable of ±1 binary sequences.
+
+    Yields:
+        Those elements of *X* that are canonical in their bracelet class.
+    """
     for x in X:
         if is_canonical(x):
             yield x
 
 
-def is_canonical(seq):
-    """Return True if seq is the lexicographically smallest of its bracelet class."""
-    candidates = equivalence_class(seq)
-    return seq == max(candidates)
+def generate_2_bracelets(n: int) -> Iterator[BinarySeq]:
+    """Yield all distinct bracelets of length *n* over {+1, −1}.
 
+    Enumerates all 2^n binary sequences and yields only the canonical
+    representative from each equivalence class.
 
-def to_canonical(seq):
-    """Return True if seq is the lexicographically smallest of its bracelet class."""
-    candidates = equivalence_class(seq)
-    return max(candidates)
+    Args:
+        n: Sequence length.
 
-
-def generate_2_bracelets(n: int):
-    """Yield all distinct bracelets of length n over k colors."""
+    Yields:
+        Canonical ±1 tuples, one per distinct bracelet.
+    """
     for seq in product([1, -1], repeat=n):
         if is_canonical(seq):
             yield seq
 
 
-def partitions_no_ones(n, max_val=None):
+def partitions_min_two(n: int, max_val: int | None = None) -> Iterator[list[int]]:
+    """Yield all integer partitions of *n* with every part ≥ 2.
+
+    Parts are yielded in non-increasing order.  Used to enumerate the ways
+    to split *n* fingers across multiple cusp components (each component
+    must have at least 2 fingers).
+
+    Args:
+        n: The integer to partition.
+        max_val: Largest part allowed (defaults to *n*; used internally
+            for recursion).
+
+    Yields:
+        Partitions as lists of ints in non-increasing order.
+    """
     if max_val is None:
         max_val = n
     if n == 0:
         yield []
     else:
         for i in range(min(max_val, n), 1, -1):
-            for p in partitions_no_ones(n - i, i):
+            for p in partitions_min_two(n - i, i):
                 yield [i] + p
 
 
-def generate_multi_2_bracelets_from_partition(partition):
+def generate_multi_2_bracelets_from_partition(
+    partition: list[int],
+) -> Iterator[tuple[BinarySeq, ...]]:
+    """Yield all distinct multi-component bracelets for a given size partition.
+
+    For each distinct part size in the partition, generates all
+    combinations-with-replacement of bracelets of that size (respecting
+    multiplicity), then takes the Cartesian product across part sizes.
+
+    Args:
+        partition: A list of component sizes (each ≥ 2), e.g. ``[4, 2, 2]``.
+
+    Yields:
+        Tuples of bracelets, one per component, flattened into a single tuple.
+    """
     uniq_elements = sorted(list(set(partition)))
     factors = []
     for x in uniq_elements:
         count = partition.count(x)
         factors.append(combinations_with_replacement(generate_2_bracelets(x), count))
 
-    return (flatten_1(T) for T in product(*factors))
+    return (flatten_once(T) for T in product(*factors))
 
 
-def generate_multi_2_bracelets(n: int):
-    for p in partitions_no_ones(n):
+def generate_multi_2_bracelets(n: int) -> Iterator[tuple[BinarySeq, ...]]:
+    """Yield all distinct multi-component bracelets that partition *n*.
+
+    Iterates over all integer partitions of *n* (parts ≥ 2), and for each
+    partition yields all distinct assignments of bracelets to components.
+
+    Args:
+        n: Total number of fingers to distribute across components.
+
+    Yields:
+        Flattened tuples of component bracelets.
+    """
+    for p in partitions_min_two(n):
         for mb in generate_multi_2_bracelets_from_partition(p):
             yield mb
