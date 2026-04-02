@@ -1,21 +1,29 @@
 """Run the solver on a single search environment.
 
 Loads a previously generated search environment from disk, runs the
-recursive backtracking solver to find all valid manifold cellulations,
-and writes completions and run metadata back to the environment directory.
+backtracking solver to find all valid manifold cellulations, and writes
+completions and run metadata back to the environment directory.
 
-The environment must be in the "init" state. On entry the state is set to
-"exec"; on completion it is set to "done". Results are written to out.jsonl
-(one completion per line) and run statistics to info.json.
+Supports stop/resume: pressing Ctrl+C during a run saves a checkpoint
+to the environment directory. Running the solver again on the same
+environment will detect the checkpoint and resume from where it left off.
+
+State transitions:
+    "init"  -> solver starts -> "exec"
+    "exec"  -> Ctrl+C        -> checkpoint saved, state stays "exec"
+    "exec"  -> solver resumes from checkpoint
+    "exec"  -> solver finishes -> "done"
 
 Usage:
     poetry run python src/solve.py my_env
 """
 
-import argparse
+import json
 import logging
+import signal
 import time
 from pathlib import Path
+import argparse
 
 from construction import (
     load_traversal,
@@ -30,6 +38,9 @@ from env import (
     write_state,
     write_info,
     write_completed_to_jsonl,
+    write_checkpoint,
+    read_checkpoint,
+    remove_checkpoint,
 )
 
 
@@ -54,8 +65,17 @@ def solve(env_path):
     are written both to the console and to ``log.txt`` in the environment
     directory.
 
+    If the environment is in "exec" state with a checkpoint, resumes
+    from the checkpoint. Installs a SIGINT handler so that Ctrl+C
+    saves a checkpoint instead of terminating immediately.
+
     Args:
-        env_path: Path to a search environment directory in "init" state.
+        env_path: Path to a search environment directory.
+
+    Returns:
+        ``"completed"`` if the solver finished the search, ``"stopped"``
+        if interrupted by Ctrl+C (checkpoint saved), or ``None`` if the
+        environment was skipped (already done, missing, or in error).
     """
     env_path = Path(env_path)
 
@@ -67,15 +87,32 @@ def solve(env_path):
         solve_logger.error(
             f"search environment '{env_path.name}' does not exist, use generate to create"
         )
+        return None
 
     state = read_state(env_path)
-    if state != "init":
-        solve_logger.error(
-            f"search environment '{env_path.name}' not in init state, skipping execution"
-        )
-        return
+    resuming = False
+    checkpoint = None
 
-    write_state(env_path, "exec")
+    if state == "done":
+        solve_logger.info(
+            f"search environment '{env_path.name}' already done, skipping"
+        )
+        return None
+    elif state == "exec":
+        checkpoint = read_checkpoint(env_path)
+        if checkpoint is None:
+            solve_logger.error(
+                f"search environment '{env_path.name}' in exec state but no checkpoint found"
+            )
+            return None
+        resuming = True
+    elif state == "init":
+        write_state(env_path, "exec")
+    else:
+        solve_logger.error(
+            f"search environment '{env_path.name}' in unknown state '{state}'"
+        )
+        return None
 
     log_file_path = env_path / "log.txt"
 
@@ -88,8 +125,9 @@ def solve(env_path):
 
     try:
         config = read_config(env_path)
-    except FileExistsError:
+    except FileNotFoundError:
         solve_logger.error(f"config file for '{env_path.name}' does not exist")
+        return None
 
     log_config(config)
 
@@ -104,29 +142,68 @@ def solve(env_path):
     construction = Construction(cusp, embeddings)
     solver = Solver(traversal, construction, num_tets, num_octs)
 
+    if resuming:
+        solver.load_checkpoint(checkpoint)
+        solve_logger.info(
+            f"Resumed from checkpoint (counter={solver.counter}, "
+            f"{len(solver.completed)} completions so far)"
+        )
+
+    # Install signal handlers for graceful stop (SIGINT for Ctrl+C,
+    # SIGTERM for kill/SLURM job cancellation)
+    def handle_stop(signum, frame):
+        sig_name = "SIGTERM" if signum == signal.SIGTERM else "SIGINT"
+        solve_logger.info(f"Stop requested ({sig_name}), will save checkpoint...")
+        solver.request_stop()
+
+    original_sigint = signal.getsignal(signal.SIGINT)
+    original_sigterm = signal.getsignal(signal.SIGTERM)
+    signal.signal(signal.SIGINT, handle_stop)
+    signal.signal(signal.SIGTERM, handle_stop)
+
     start_time = time.perf_counter()
-    num_completed = 0
-    solver.run()
+    result = solver.run()
     end_time = time.perf_counter()
 
-    solve_logger.info(
-        f"Finish after {solver.counter} iterations in {end_time - start_time:.6f} seconds"
-    )
-    solve_logger.info(f"{len(solver.completed)} completions found")
+    # Restore original signal handlers
+    signal.signal(signal.SIGINT, original_sigint)
+    signal.signal(signal.SIGTERM, original_sigterm)
 
-    for completion in solver.completed:
-        write_completed_to_jsonl(env_path, completion)
+    if result == "stopped":
+        solve_logger.info(
+            f"Stopped after {solver.counter} iterations "
+            f"({len(solver.completed)} completions so far)"
+        )
+        checkpoint_data = solver.save_checkpoint()
+        write_checkpoint(env_path, checkpoint_data)
+        solve_logger.info("Checkpoint saved, run again to resume")
+        return "stopped"
 
-    write_info(
-        env_path,
-        {
-            "runtime": end_time - start_time,
-            "iterations": solver.counter,
-            "num_completed": num_completed,
-        },
-    )
+    else:
+        solve_logger.info(
+            f"Finished after {solver.counter} iterations "
+            f"in {end_time - start_time:.6f} seconds"
+        )
+        solve_logger.info(f"{len(solver.completed)} completions found")
 
-    write_state(env_path, "done")
+        # Write all completions (overwrite any partial output)
+        out_path = env_path / "out.jsonl"
+        out_path.unlink(missing_ok=True)
+        for completion in solver.completed:
+            write_completed_to_jsonl(env_path, completion)
+
+        write_info(
+            env_path,
+            {
+                "runtime": end_time - start_time,
+                "iterations": solver.counter,
+                "num_completed": len(solver.completed),
+            },
+        )
+
+        write_state(env_path, "done")
+        remove_checkpoint(env_path)
+        return "completed"
 
 
 def main():

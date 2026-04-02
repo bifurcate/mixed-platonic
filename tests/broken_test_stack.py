@@ -1,29 +1,28 @@
 import pytest
 
 from base import (
-  Sqr,
-  Tri,
-  Oct,
-  Tet,
-  OctSqrEmbedding,
-  TetTriEmbedding,
+    Sqr,
+    Tri,
+    Oct,
+    Tet,
+    OctSqrEmbedding,
+    TetTriEmbedding,
 )
 
 from construction import (
-  FingerCuspGenerator,
-  Embeddings,
-  Construction,
+    FingerCuspGenerator,
+    Embeddings,
+    Construction,
 )
 
 from solver import (
-  Solver,
-  INIT,
-  REGULAR,
-  INDUCED,
+    Solver,
+    INIT,
+    REGULAR,
+    INDUCED,
 )
 
 from draw import draw_stack
-
 
 # def test_stack():
 

@@ -6,6 +6,11 @@ script can run in parallel against the same census directory -- the
 file-based claiming protocol (using OS-level O_CREAT|O_EXCL) prevents
 two workers from solving the same environment.
 
+If a worker is interrupted (Ctrl+C), the solver saves a checkpoint and
+the worker releases its claim on the current environment so that another
+worker (or a restarted instance) can pick it up and resume from the
+checkpoint.
+
 Usage:
     poetry run python src/solve_census.py my_census
 
@@ -38,6 +43,20 @@ def mark_done(work_dir: Path):
     """Create a .done marker file in a work directory."""
     done_marker = work_dir / DONE_FILE
     done_marker.touch()
+
+
+def release_claim(work_dir: Path):
+    """Remove the .claimed marker so another worker can pick up this directory.
+
+    Called when the solver is stopped mid-run (e.g. via Ctrl+C). The
+    checkpoint is preserved in the environment directory, so the next
+    worker that claims this directory will resume from where it left off.
+
+    Args:
+        work_dir: Path to the claimed work directory.
+    """
+    claim_marker = work_dir / CLAIM_FILE
+    claim_marker.unlink(missing_ok=True)
 
 
 def claim_dir(census_dir) -> Path:
@@ -97,9 +116,18 @@ def main():
             print(f"[{os.getpid()}] No more work, exiting", flush=True)
             break
         print(f"[{os.getpid()}] Working on {work_dir}", flush=True)
-        solve(work_dir)
-        mark_done(work_dir)
-        print(f"[{os.getpid()}] Finished {work_dir}", flush=True)
+        result = solve(work_dir)
+        if result == "completed":
+            mark_done(work_dir)
+            print(f"[{os.getpid()}] Finished {work_dir}", flush=True)
+        elif result == "stopped":
+            release_claim(work_dir)
+            print(f"[{os.getpid()}] Stopped, exiting", flush=True)
+            break
+        else:
+            # Skipped (already done, error, etc.) — mark done to avoid retrying
+            mark_done(work_dir)
+            print(f"[{os.getpid()}] Skipped {work_dir}", flush=True)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-"""Recursive backtracking search for valid manifold cellulations.
+"""Backtracking search for valid manifold cellulations.
 
 This module implements the core search algorithm that enumerates all valid
 ways to embed manifold cell vertices into cusp cells. The search proceeds
@@ -9,7 +9,7 @@ as follows:
 3. After placing an embedding, propagate constraints: neighboring cusp
    cells may have their embeddings fully determined (induced) by the
    current state. Add all induced embeddings.
-4. If no contradiction arose, recurse to embed the next cusp cell.
+4. If no contradiction arose, descend to embed the next cusp cell.
 5. On backtrack, remove the placed and induced embeddings and try the
    next candidate.
 
@@ -18,7 +18,14 @@ embedding iterator is at ``vert_idx == 0`` for a manifold cell, it means
 no prior embedding constrains that cell's vertex placement. Only one
 vertex assignment is tried in this case, since the others would produce
 equivalent solutions under relabeling.
+
+The solver uses an explicit stack rather than recursion, which enables
+checkpointing: the search can be stopped (e.g. via Ctrl+C) and resumed
+later from exactly where it left off.
 """
+
+from dataclasses import dataclass, field
+
 from base import (
     EmbeddingType,
     Embedding,
@@ -30,6 +37,8 @@ from base import (
     Octahedron,
     TetTriEmbedding,
     OctSqrEmbedding,
+    embedding_from_tuple,
+    cusp_cell_from_tuple,
 )
 
 from construction import (
@@ -183,28 +192,73 @@ class OctSqrEmbeddingIterator(EmbeddingIterator):
         super().__init__(embeddings, num_manifold_cells)
 
 
-INIT = 0
-REGULAR = 1
-INDUCED = 2
+@dataclass
+class StackFrame:
+    """One level of the backtracking search stack.
 
-ENTRY_TYPE_SHORT_LABELS = {
-    INIT: "O",
-    REGULAR: "R",
-    INDUCED: "I",
-}
+    Each frame tracks the embedding candidate currently being tried for
+    a single cusp cell, along with any embeddings that were induced by
+    constraint propagation after placing it.
 
-EntryType = int
+    Attributes:
+        cusp_cell: The cusp cell being embedded at this search level.
+        embedding: The current candidate embedding, or None if no candidate
+            has been tried yet at this level.
+        induced_embeddings: Embeddings added by constraint propagation after
+            placing the candidate.
+        init: True when the embedding iterator was at vert_idx==0 for this
+            candidate, used for symmetry breaking.
+        placed: True when the embedding and its induced embeddings are
+            currently in the Embeddings collection. This is runtime state
+            only and is not serialized in checkpoints.
+    """
+
+    cusp_cell: CuspCell
+    embedding: Embedding | None = None
+    induced_embeddings: list[Embedding] = field(default_factory=list)
+    init: bool = False
+    placed: bool = False
+
+    def dump(self) -> dict:
+        """Serialize to a JSON-compatible dict for checkpointing."""
+        return {
+            "cusp_cell": tuple(self.cusp_cell),
+            "embedding": tuple(self.embedding) if self.embedding else None,
+            "induced_embeddings": [tuple(ie) for ie in self.induced_embeddings],
+            "init": self.init,
+        }
+
+    @classmethod
+    def load(cls, data: dict) -> "StackFrame":
+        """Deserialize from a checkpoint dict."""
+        cusp_cell = cusp_cell_from_tuple(data["cusp_cell"])
+        embedding = (
+            embedding_from_tuple(data["embedding"]) if data["embedding"] else None
+        )
+        induced = [embedding_from_tuple(ie) for ie in data["induced_embeddings"]]
+        return cls(
+            cusp_cell=cusp_cell,
+            embedding=embedding,
+            induced_embeddings=induced,
+            init=data["init"],
+        )
 
 
 class Solver:
-    """Recursive backtracking search engine for cusp completion.
+    """Backtracking search engine for cusp completion.
 
     Drives the search for valid embedding assignments over all cusp cells.
     For each unembedded cusp cell (in traversal order), the search tries
     every candidate embedding from the appropriate iterator, propagates
-    induced constraints to a fixpoint, and recurses. Completed solutions
+    induced constraints to a fixpoint, and descends. Completed solutions
     (where every cusp cell has an embedding) are serialized and stored in
     ``self.completed``.
+
+    The search uses an explicit stack (``self.stack``) rather than recursive
+    calls, enabling checkpoint/resume: the solver can be stopped mid-search
+    via ``request_stop()`` and the state saved with ``save_checkpoint()``.
+    A subsequent run can restore the state with ``load_checkpoint()`` and
+    call ``run()`` to continue from where it left off.
 
     Attributes:
         construction: The Construction holding cusp, embeddings, and
@@ -216,6 +270,7 @@ class Solver:
         oct_sqr_embedding_iterator: Shared iterator state for oct-sqr candidates.
         counter: Total number of embedding placements attempted (for diagnostics).
         completed: List of serialized embedding states, one per valid solution.
+        stack: Explicit backtracking stack (list of StackFrame).
     """
 
     def __init__(
@@ -239,6 +294,57 @@ class Solver:
         )
         self.counter: int = 0
         self.completed: list[list[tuple]] = []
+        self.stack: list[StackFrame] = []
+        self._stop_requested: bool = False
+
+    def request_stop(self) -> None:
+        """Signal the solver to stop at the next safe point.
+
+        The solver will finish backtracking the current candidate (if any),
+        then return "stopped" from ``run()``. The caller can then save a
+        checkpoint and resume later.
+        """
+        self._stop_requested = True
+
+    def save_checkpoint(self) -> dict:
+        """Serialize the current search state for later resumption.
+
+        Returns:
+            A JSON-serializable dict containing the search stack, iteration
+            counter, and any completions found so far.
+        """
+        return {
+            "stack": [frame.dump() for frame in self.stack],
+            "counter": self.counter,
+            "completed": self.completed,
+        }
+
+    def load_checkpoint(self, data: dict) -> None:
+        """Restore search state from a previously saved checkpoint.
+
+        Rebuilds the explicit search stack and re-adds all placed embeddings
+        to the Embeddings collection. All frames except the topmost have
+        their embeddings re-placed, so the search resumes by trying the
+        next candidate for the top frame.
+
+        Args:
+            data: Checkpoint dict as produced by ``save_checkpoint()``.
+        """
+        self.counter = data["counter"]
+        self.completed = data["completed"]
+        self.stack = []
+        self._stop_requested = False
+
+        frames = data["stack"]
+        for i, frame_data in enumerate(frames):
+            frame = StackFrame.load(frame_data)
+            # All frames except the last have their embeddings currently placed
+            if i < len(frames) - 1:
+                frame.placed = True
+                self.construction.embeddings.add_embedding(frame.embedding)
+                for ie in frame.induced_embeddings:
+                    self.construction.embeddings.add_embedding(ie)
+            self.stack.append(frame)
 
     def get_next_embedding(
         self, cusp_cell: CuspCell, embedding: Embedding | None
@@ -350,130 +456,110 @@ class Solver:
         """Serializes the current embedding state and appends it to ``completed``."""
         self.completed.append(self.construction.embeddings.dump())
 
-    def run(self) -> None:
-        """Executes the recursive backtracking search from the current state.
+    def run(self) -> str:
+        """Execute the backtracking search.
 
-        This is the main entry point for the search. Each call to ``run``
-        handles one level of the recursion: it picks the first unembedded
-        cusp cell and systematically tries candidate embeddings for it.
+        Uses an explicit stack instead of recursion. Each stack frame
+        represents one level of the search: a cusp cell and the candidate
+        embedding currently being tried for it.
 
-        **Base case**: If every cusp cell already has an embedding, the
-        current state is a complete valid solution. It is serialized and
-        appended to ``self.completed``, and the method returns so the
-        caller can continue searching for additional solutions.
+        The main loop repeatedly:
 
-        **Recursive case**: For the first unembedded cusp cell, the method
-        enters a while loop that iterates over candidate embeddings from
-        ``get_next_embedding``. Each iteration performs:
+        1. **Backtracks** the top frame's embedding if one is currently
+           placed (removing induced embeddings first, then the candidate).
+           If the symmetry-breaking ``init`` flag was set, the frame is
+           popped entirely.
 
-        1. **Place**: Add the candidate embedding to the shared Embeddings
-           collection.
+        2. **Checks for stop requests** — if ``request_stop()`` was called
+           (e.g. via a signal handler), returns ``"stopped"`` so the caller
+           can save a checkpoint.
 
-        2. **Propagate (fixpoint loop)**: Repeatedly call ``get_next_induced``
-           to find cusp cells whose embeddings are now fully determined by
-           their already-embedded neighbors. Each induced embedding is added
-           immediately, which may in turn induce further embeddings. The
-           loop continues until either:
+        3. **Tries the next candidate** embedding for the top frame's cusp
+           cell. If all candidates are exhausted, pops the frame.
 
-           - A contradiction is detected (``ok=False``): two neighbors
-             induce conflicting embeddings, or an induced embedding would
-             double-assign a manifold vertex. This means the current
-             candidate is invalid.
-           - No more inductions are possible (``ok=True, embedding=None``):
-             the constraint propagation has reached a fixpoint and the
-             partial assignment is consistent so far.
+        4. **Places** the candidate and **propagates** induced embeddings
+           to a fixpoint. If a contradiction is found, loops back to
+           backtrack and try the next candidate.
 
-        3. **Recurse**: If propagation succeeded (``ok=True``), recursively
-           call ``run()`` to embed the next unembedded cusp cell. This may
-           find solutions (appended to ``completed``) or exhaust its
-           options and return.
+        5. If propagation succeeded and all cusp cells are now embedded,
+           records the completion. Otherwise, **pushes a new frame** for
+           the next unembedded cusp cell and continues.
 
-        4. **Backtrack**: Regardless of whether propagation or recursion
-           succeeded, undo all changes: remove every induced embedding
-           (in the order they were added), then remove the candidate
-           embedding itself. This restores the Embeddings collection to
-           the exact state it was in before step 1, so the next candidate
-           starts from a clean slate.
-
-        5. **Symmetry-breaking check**: If ``init`` is True, stop the
-           loop and return. The ``init`` flag (from ``get_next_embedding``)
-           is True when the embedding iterator is at ``vert_idx == 0`` for
-           the current manifold cell. This arises in two situations:
-
-           - **First candidate** (``embedding`` was None, iterator was
-             reset): ``vert_idx == 0`` means no prior embedding constrains
-             this manifold cell, so the vertex choice is arbitrary up to
-             the cell's symmetry group. Only one vertex assignment (and
-             all its permutations) needs to be tried; the others would
-             yield equivalent solutions. After trying all permutations
-             for this one vertex, the method returns.
-
-           - **Manifold cell boundary**: The iterator exhausted all
-             ``(vert, perm)`` pairs for one manifold cell and wrapped to
-             ``vert_idx == 0`` of the next cell. Since each manifold cell's
-             vertices are interchangeable when no prior constraints exist,
-             trying additional cells would be redundant.
-
-           When ``init`` is False, the iterator is partway through a
-           manifold cell's vertex/permutation space (because prior
-           embeddings already constrained some of its vertices, causing
-           the iterator to skip to a non-zero vert_idx). In this case
-           the full remaining space must be searched, so the loop continues.
+        Returns:
+            ``"completed"`` if the entire search space was explored, or
+            ``"stopped"`` if the search was interrupted via ``request_stop()``.
         """
-        # --- Base case: all cusp cells embedded ---
-        tr_idx = (
-            self.get_least_available_cusp_cell_idx()
-        )  # maybe make this return embedding
-        if tr_idx is None:
-            self.process_completed()
-            return
+        # Initialize the stack on a fresh start
+        if not self.stack:
+            tr_idx = self.get_least_available_cusp_cell_idx()
+            if tr_idx is None:
+                self.process_completed()
+                return "completed"
+            self.stack.append(StackFrame(cusp_cell=self.traversal[tr_idx]))
 
-        cusp_cell = self.traversal[tr_idx]
-        embedding = self.construction.embeddings.get_embedding_by_cusp_cell(cusp_cell)
-        assert embedding is None
+        while self.stack:
+            frame = self.stack[-1]
 
-        # --- Recursive case: try each candidate for this cusp cell ---
-        while True:
-            # Advance the iterator to the next candidate. On the first
-            # iteration embedding is None, so the iterator resets to the
-            # beginning of its index space. On subsequent iterations it
-            # resumes from the last tried position.
-            init, next_embedding = self.get_next_embedding(cusp_cell, embedding)
+            # Step 1: Backtrack if the current candidate is placed
+            if frame.placed:
+                for ie in frame.induced_embeddings:
+                    self.construction.embeddings.remove_embedding(ie)
+                self.construction.embeddings.remove_embedding(frame.embedding)
+                frame.induced_embeddings = []
+                frame.placed = False
+
+                # Symmetry breaking: if init was True for this candidate,
+                # all permutations for an unconstrained vertex have been
+                # tried. Pop this frame.
+                if frame.init:
+                    self.stack.pop()
+                    continue
+
+            # Step 2: Check for stop request (safe point — nothing from
+            # this frame is placed, so the stack is in a clean state for
+            # checkpointing)
+            if self._stop_requested:
+                return "stopped"
+
+            # Step 3: Try the next candidate embedding
+            init, next_embedding = self.get_next_embedding(
+                frame.cusp_cell, frame.embedding
+            )
             if next_embedding is None:
-                return  # All candidates exhausted for this cusp cell.
+                self.stack.pop()
+                continue
 
-            embedding = next_embedding
+            frame.embedding = next_embedding
+            frame.init = init
 
-            # Step 1: Place the candidate embedding.
-            self.construction.embeddings.add_embedding(embedding)
-
+            # Step 4a: Place the candidate
+            self.construction.embeddings.add_embedding(frame.embedding)
+            frame.placed = True
             self.counter += 1
 
-            # Step 2: Propagate induced embeddings to a fixpoint.
-            # Each newly induced embedding may enable further inductions,
-            # so we loop until stable or until a contradiction is found.
-            induced_embeddings = []
+            # Step 4b: Propagate induced embeddings to fixpoint
+            frame.induced_embeddings = []
+            ok = True
             while True:
-                ok, _, next_induced_embedding = self.get_next_induced()
-                if not ok or next_induced_embedding is None:
+                ok_inner, _, next_induced = self.get_next_induced()
+                if not ok_inner:
+                    ok = False
                     break
-                induced_embeddings.append(next_induced_embedding)
-                self.construction.embeddings.add_embedding(next_induced_embedding)
+                if next_induced is None:
+                    break
+                frame.induced_embeddings.append(next_induced)
+                self.construction.embeddings.add_embedding(next_induced)
 
-            # Step 3: If consistent, recurse to embed the next cusp cell.
-            if ok:
-                self.run()
+            if not ok:
+                continue  # Contradiction — will backtrack on next iteration
 
-            # Step 4: Backtrack — undo all embeddings from this iteration
-            # (induced first, then the candidate itself) to restore the
-            # state for the next candidate.
-            for ie in induced_embeddings:
-                self.construction.embeddings.remove_embedding(ie)
+            # Step 5: Check if all cusp cells are now embedded
+            next_tr_idx = self.get_least_available_cusp_cell_idx()
+            if next_tr_idx is None:
+                self.process_completed()
+                continue  # Will backtrack on next iteration to find more
 
-            self.construction.embeddings.remove_embedding(embedding)
+            # Push a new frame for the next unembedded cusp cell
+            self.stack.append(StackFrame(cusp_cell=self.traversal[next_tr_idx]))
 
-            # Step 5: Symmetry-breaking — if init is True, we have tried
-            # all permutations for an unconstrained manifold cell vertex.
-            # Further candidates would be equivalent under symmetry.
-            if init:
-                return
+        return "completed"
