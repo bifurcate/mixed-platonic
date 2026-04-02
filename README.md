@@ -74,6 +74,19 @@ poetry run python src/solve.py my_search
 
 Solutions are written to `my_search/out.jsonl`, one per line.
 
+The solver supports **stop/resume**: pressing Ctrl+C saves a checkpoint to
+the environment directory. Running the same command again detects the
+checkpoint and resumes from where it left off:
+
+```sh
+# First run — press Ctrl+C to stop early
+poetry run python src/solve.py my_search
+# ^C — checkpoint saved
+
+# Resume from checkpoint
+poetry run python src/solve.py my_search
+```
+
 ### 3. Analyze results
 
 Extract Regina isomorphism signatures from completed solutions:
@@ -111,13 +124,13 @@ The `draw.py` module can render cusp tilings with embedding annotations using py
 src/
   base.py              Core data structures (cells, pairings, embeddings)
   construction.py      Cusp tiling, embedding collection, constraint propagation
-  solver.py            Recursive backtracking search algorithm
+  solver.py            Backtracking search with checkpoint/resume
   finger_cusp.py       Finger pattern cusp generator
   long_cusp.py         Long cusp pattern generator
-  env.py               Search environment I/O (config, state, results)
+  env.py               Search environment I/O (config, state, checkpoints)
   generate.py          CLI: create a single search environment
   generate_census.py   CLI: create environments for all patterns of a given size
-  solve.py             CLI: run the solver on a single environment
+  solve.py             CLI: run the solver (supports stop/resume)
   solve_census.py      CLI: distributed worker that solves a census
   analyze.py           CLI: extract Regina isomorphism signatures
   analyze_census.py    CLI: report census status and completions

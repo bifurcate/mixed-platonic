@@ -18,6 +18,7 @@ The module provides:
     - Permutation lookup tables for enumerating vertex arrangements
     - Serialization helpers (``*_from_tuple``) for persistence
 """
+
 from typing import Optional
 from collections.abc import Iterator
 from functools import cached_property

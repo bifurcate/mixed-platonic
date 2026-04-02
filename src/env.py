@@ -5,11 +5,12 @@ single solver run. This module provides functions to create, read, and write
 the files that make up an environment:
 
     env_dir/
-        config.json  — cusp tiling, traversal order, and cell counts
-        state.json   — lifecycle state: "init" | "exec" | "done"
-        info.json    — post-run metadata (runtime, iterations, completions)
-        out.jsonl    — completed embeddings, one JSON object per line
-        log.txt      — solver log output (created by solve.py)
+        config.json      — cusp tiling, traversal order, and cell counts
+        state.json       — lifecycle state: "init" | "exec" | "done"
+        info.json        — post-run metadata (runtime, iterations, completions)
+        out.jsonl        — completed embeddings, one JSON object per line
+        log.txt          — solver log output (created by solve.py)
+        checkpoint.json  — solver checkpoint for stop/resume (created on stop)
 
 All other modules that need to interact with environment data on disk import
 from here rather than duplicating I/O logic.
@@ -149,6 +150,52 @@ def write_completed_to_jsonl(env_path: Path, completion):
     completed_file_path = Path(env_path) / "out.jsonl"
     with open(completed_file_path, "a") as f:
         f.write(json.dumps(completed_entry) + "\n")
+
+
+def write_checkpoint(env_path: Path, checkpoint: dict):
+    """Write solver checkpoint to checkpoint.json.
+
+    The checkpoint captures the solver's explicit search stack, iteration
+    counter, and any completions found so far, allowing the search to be
+    resumed later from exactly where it left off.
+
+    Args:
+        env_path: Path to the environment directory.
+        checkpoint: Serialized solver state from ``Solver.save_checkpoint()``.
+    """
+    checkpoint_path = Path(env_path) / "checkpoint.json"
+    with open(checkpoint_path, "w", encoding="utf-8") as f:
+        json.dump(checkpoint, f)
+
+
+def read_checkpoint(env_path: Path) -> dict | None:
+    """Read solver checkpoint from checkpoint.json.
+
+    Args:
+        env_path: Path to the environment directory.
+
+    Returns:
+        Checkpoint dict, or None if no checkpoint exists.
+    """
+    checkpoint_path = Path(env_path) / "checkpoint.json"
+    try:
+        with open(checkpoint_path, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return None
+
+
+def remove_checkpoint(env_path: Path):
+    """Remove checkpoint.json if it exists.
+
+    Called after the solver completes normally to clean up the checkpoint
+    file, since it is no longer needed.
+
+    Args:
+        env_path: Path to the environment directory.
+    """
+    checkpoint_path = Path(env_path) / "checkpoint.json"
+    checkpoint_path.unlink(missing_ok=True)
 
 
 def create_env(env_path: Path, num_tets: int, num_octs: int, cusp: Cusp, traversal):

@@ -20,6 +20,7 @@ determine (induce) the embedding on the other side. The search algorithm
 (in ``solver.py``) places embeddings one by one, propagating induced
 constraints via the methods here, and backtracks when contradictions arise.
 """
+
 from base import (
     TRI_EDGES,
     SQR_EDGES,
@@ -197,9 +198,9 @@ class ManifoldCellulation:
 
         # insert in both directions
         self.X[cp.half_face_src.manifold_cell][cp.half_face_src.face_spec] = cp
-        self.X[cp.inv.half_face_src.manifold_cell][cp.inv.half_face_src.face_spec] = (
-            cp.inv
-        )
+        self.X[cp.inv.half_face_src.manifold_cell][
+            cp.inv.half_face_src.face_spec
+        ] = cp.inv
 
     def get_cell_pairings(
         self, manifold_cell: ManifoldCell
@@ -500,9 +501,6 @@ def get_embedding_tgt(
             None,
             OctSqrEmbedding(manifold_cell_tgt, cusp_cell_tgt, embedding_spec_tgt),
         )
-
-
-# TODO: traversal concept does not need to be in construction. remove and adjust implementation
 
 
 class Construction:

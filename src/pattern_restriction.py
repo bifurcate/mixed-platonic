@@ -239,8 +239,12 @@ def round_with_tolerance(value, tolerance):
     if isinstance(value, complex):
         real_rounded = round(value.real)
         imag_rounded = round(value.imag)
-        real_rounded_final = real_rounded if abs(value.real - real_rounded) <= tolerance else value.real
-        imag_rounded_final = imag_rounded if abs(value.imag - imag_rounded) <= tolerance else value.imag
+        real_rounded_final = (
+            real_rounded if abs(value.real - real_rounded) <= tolerance else value.real
+        )
+        imag_rounded_final = (
+            imag_rounded if abs(value.imag - imag_rounded) <= tolerance else value.imag
+        )
         return complex(real_rounded_final, imag_rounded_final)
     else:
         rounded = round(value)
