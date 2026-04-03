@@ -1,18 +1,18 @@
-"""Bracelet and necklace enumeration for binary (±1) cyclic sequences.
+"""Bracelet and necklace enumeration for binary (0/1) cyclic sequences.
 
 A *necklace* is an equivalence class of sequences under cyclic rotation.
 A *bracelet* is an equivalence class under both rotation and reflection.
-In this module, sequences additionally identify +s with −s (sign
-inversion), so the full equivalence class of a sequence includes all
-rotations and reflections of both the sequence and its negation.
+In this module, sequences additionally identify under complement (0 ↔ 1),
+so the full equivalence class of a sequence includes all rotations and
+reflections of both the sequence and its bitwise complement.
 
 The primary use case is enumerating distinct finger patterns for cusp
-cellulations: each finger pattern is a cyclic ±1 sequence, and two
+cellulations: each finger pattern is a cyclic 0/1 sequence, and two
 patterns are equivalent if one can be obtained from the other by rotation,
-reflection, or global sign flip.
+reflection, or global complement.
 
 Public API:
-    - ``generate_2_bracelets(n)`` — all bracelets of length *n* over {+1, −1}
+    - ``generate_2_bracelets(n)`` — all bracelets of length *n* over {0, 1}
     - ``generate_multi_2_bracelets(n)`` — multi-component bracelets that
       partition *n* into components of size ≥ 2
     - ``is_canonical(seq)`` / ``to_canonical(seq)`` — canonical representative
@@ -27,7 +27,7 @@ from itertools import (
     combinations_with_replacement,
 )
 
-# A binary sequence is a tuple of +1/−1 values representing a cyclic pattern.
+# A binary sequence is a tuple of 0/1 values representing a cyclic pattern.
 BinarySeq = tuple[int, ...]
 
 
@@ -48,9 +48,9 @@ def rotate(seq: BinarySeq, i: int) -> BinarySeq:
     return seq[i:] + seq[:i]
 
 
-def negate(seq: BinarySeq) -> BinarySeq:
-    """Return the element-wise sign negation of *seq* (+1 ↔ −1)."""
-    return tuple(-x for x in seq)
+def complement(seq: BinarySeq) -> BinarySeq:
+    """Return the bitwise complement of *seq* (0 ↔ 1)."""
+    return tuple(1 - x for x in seq)
 
 
 def all_rotations(seq: BinarySeq) -> list[BinarySeq]:
@@ -67,21 +67,21 @@ def all_reflections(seq: BinarySeq) -> list[BinarySeq]:
 def equivalence_class(seq: BinarySeq) -> set[BinarySeq]:
     """Return the full bracelet equivalence class of *seq*.
 
-    Includes all rotations and reflections of both *seq* and its negation,
-    giving the orbit under the dihedral group combined with sign inversion.
+    Includes all rotations and reflections of both *seq* and its complement,
+    giving the orbit under the dihedral group combined with bitwise complement.
     """
-    negated = negate(seq)
-    return set(all_reflections(seq) + all_reflections(negated))
+    complemented = complement(seq)
+    return set(all_reflections(seq) + all_reflections(complemented))
 
 
 def balanced_sequences(n: int) -> list[BinarySeq]:
-    """Generate all ±1 sequences of length *n* with equal counts of +1 and −1.
+    """Generate all 0/1 sequences of length *n* with equal counts of 0 and 1.
 
     Args:
         n: Sequence length; must be even.
 
     Returns:
-        List of all balanced sequences (n/2 entries of each sign), or an
+        List of all balanced sequences (n/2 entries of each value), or an
         empty list if *n* is odd.
     """
     if n % 2 != 0:
@@ -90,40 +90,20 @@ def balanced_sequences(n: int) -> list[BinarySeq]:
     k = n // 2
     result: list[BinarySeq] = []
 
-    for plus_positions in combinations(range(n), k):
-        s = [-1] * n
-        for i in plus_positions:
+    for one_positions in combinations(range(n), k):
+        s = [0] * n
+        for i in one_positions:
             s[i] = 1
         result.append(tuple(s))
 
     return result
 
 
-def integrate_string(seq: BinarySeq, c: int) -> list[int]:
-    """Compute a discrete integral of *seq* with initial value 1.
-
-    Appends *c* at each position where consecutive entries (cyclically)
-    have the same sign.
-
-    Args:
-        seq: A ±1 binary sequence.
-        c: Value to append when adjacent entries agree.
-
-    Returns:
-        The integrated sequence.
-    """
-    int_seq = [1]
-    n = len(seq)
-    for i in range(len(seq)):
-        if seq[i] == seq[(i + 1) % n]:
-            int_seq.append(c)
-
-
 def is_canonical(seq: BinarySeq) -> bool:
     """Return True if *seq* is the canonical (lexicographically largest) representative.
 
     The canonical representative is the lexicographic maximum over the full
-    bracelet equivalence class (rotations, reflections, and sign negation).
+    bracelet equivalence class (rotations, reflections, and complement).
     """
     candidates = equivalence_class(seq)
     return seq == max(candidates)
@@ -133,7 +113,7 @@ def to_canonical(seq: BinarySeq) -> BinarySeq:
     """Return the canonical (lexicographically largest) representative of *seq*'s bracelet class.
 
     Args:
-        seq: Any ±1 binary sequence.
+        seq: Any 0/1 binary sequence.
 
     Returns:
         The lexicographically largest sequence in the equivalence class.
@@ -146,7 +126,7 @@ def reduce_to_bracelets(X: Iterator[BinarySeq]) -> Iterator[BinarySeq]:
     """Filter an iterable of sequences, yielding only canonical representatives.
 
     Args:
-        X: Iterable of ±1 binary sequences.
+        X: Iterable of 0/1 binary sequences.
 
     Yields:
         Those elements of *X* that are canonical in their bracelet class.
@@ -157,7 +137,7 @@ def reduce_to_bracelets(X: Iterator[BinarySeq]) -> Iterator[BinarySeq]:
 
 
 def generate_2_bracelets(n: int) -> Iterator[BinarySeq]:
-    """Yield all distinct bracelets of length *n* over {+1, −1}.
+    """Yield all distinct bracelets of length *n* over {0, 1}.
 
     Enumerates all 2^n binary sequences and yields only the canonical
     representative from each equivalence class.
@@ -166,9 +146,9 @@ def generate_2_bracelets(n: int) -> Iterator[BinarySeq]:
         n: Sequence length.
 
     Yields:
-        Canonical ±1 tuples, one per distinct bracelet.
+        Canonical 0/1 tuples, one per distinct bracelet.
     """
-    for seq in product([1, -1], repeat=n):
+    for seq in product([1, 0], repeat=n):
         if is_canonical(seq):
             yield seq
 

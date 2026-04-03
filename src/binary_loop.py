@@ -13,7 +13,9 @@ and 1s with mod-2 arithmetic:
 
 from itertools import combinations
 
-# Type alias for a binary (0/1) sequence.
+# Type alias for a binary (0/1) sequence.  Same value domain as
+# bracelets.BinarySeq; the distinct alias clarifies intent (discrete
+# calculus vs. bracelet enumeration).
 BinaryLoop = tuple[int, ...]
 
 

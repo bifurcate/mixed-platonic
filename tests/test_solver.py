@@ -4,7 +4,7 @@ from construction import Cusp, Embeddings, Construction
 from finger_cusp import FingerCuspGenerator
 from solver import Solver, StackFrame
 
-FINGER_PATTERN = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
+FINGER_PATTERN = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
 NUM_TETS = 6
 NUM_OCTS = 2
 

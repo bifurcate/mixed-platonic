@@ -32,7 +32,7 @@ import itertools
 from collections.abc import Iterator
 from itertools import permutations
 
-from finger_cusp import FingerPattern, to_finger_pattern_list, to_finger_pattern_str
+from finger_cusp import to_finger_pattern_list, to_finger_pattern_str
 from bracelets import BinarySeq, is_canonical, to_canonical, reduce_to_bracelets
 from binary_loop import binary_tuples_of_weight
 

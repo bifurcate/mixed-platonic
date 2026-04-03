@@ -17,7 +17,7 @@ from finger_cusp import (
 
 def test_finger_cusp_generator_add_finger():
     cusp = Cusp()
-    finger_pattern = [1, -1]
+    finger_pattern = [1, 0]
     cusp_generator = FingerCuspGenerator(cusp, finger_pattern)
 
     cusp_generator.add_finger(0)
@@ -63,13 +63,13 @@ def test_finger_cusp_generator_add_finger():
 
 def test_finger_cusp_generator_generate():
     cusp = Cusp()
-    finger_pattern = [1, -1]
+    finger_pattern = [1, 0]
     cusp_generator = FingerCuspGenerator(cusp, finger_pattern)
     cusp_generator.generate()
 
 
 def test_multi_finger_cusp_generator_generate():
     cusp = Cusp()
-    multi_finger_pattern = [[1, -1], [1, -1]]
+    multi_finger_pattern = [[1, 0], [1, 0]]
     cusp_generator = MultiFingerCuspGenerator(cusp, multi_finger_pattern)
     cusp_generator.generate()

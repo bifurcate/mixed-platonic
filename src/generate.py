@@ -19,6 +19,7 @@ from finger_cusp import (
     FingerCuspGenerator,
     FingerPattern,
     MultiFingerCuspGenerator,
+    parse_finger_pattern,
 )
 from long_cusp import LongCuspGenerator
 from env import (
@@ -28,32 +29,28 @@ from env import (
 )
 
 
-def parse_finger_pattern_arg(input_fp: str):
-    """Parse a CLI finger pattern string into a list of +1/-1 values.
+def parse_finger_pattern_arg(input_fp: str) -> FingerPattern:
+    """Parse a CLI finger pattern string into a list of 0/1 values.
+
+    Accepts either ``{+,-}`` or ``{0,1}`` format strings.
 
     Args:
-        input_fp: String of '+' and '-' characters. Length must be
-            divisible by 6 (each group of 6 encodes one octahedron).
+        input_fp: String of ``'+'``/``'-'`` or ``'0'``/``'1'`` characters.
+            Length must be divisible by 6 (each group of 6 encodes one
+            octahedron).
 
     Returns:
-        List of integers (+1 or -1).
+        List of 0/1 integers.
 
     Raises:
         ValueError: If the string contains invalid characters or has
             a length not divisible by 6.
     """
-    if not all(c in "+-" for c in input_fp):
-        raise ValueError("Input finger pattern must consist of '+' and '-' characters")
+    finger_pattern = parse_finger_pattern(input_fp)
 
-    if len(input_fp) % 6 != 0:
+    if len(finger_pattern) % 6 != 0:
         raise ValueError("Input finger pattern length must be divisible by 6")
 
-    finger_pattern = []
-    for c in input_fp:
-        if c == "+":
-            finger_pattern.append(1)
-        else:
-            finger_pattern.append(-1)
     return finger_pattern
 
 
@@ -64,7 +61,7 @@ def determine_num_tets_octs(finger_pattern):
     and three tetrahedra.
 
     Args:
-        finger_pattern: List of +1/-1 values.
+        finger_pattern: List of 0/1 values.
 
     Returns:
         Tuple of (num_tets, num_octs).
@@ -82,7 +79,7 @@ def generate_config_from_finger_pattern(env_path, finger_pattern):
 
     Args:
         env_path: Path to the environment directory.
-        finger_pattern: List of +1/-1 values encoding the finger pattern.
+        finger_pattern: List of 0/1 values encoding the finger pattern.
     """
     cusp = Cusp()
     cusp_generator = FingerCuspGenerator(cusp, finger_pattern)
@@ -132,7 +129,7 @@ def generate(env_path: Path, finger_pattern: FingerPattern):
 
     Args:
         env_path: Path to the environment directory to create.
-        finger_pattern: List of +1/-1 values encoding the finger pattern.
+        finger_pattern: List of 0/1 values encoding the finger pattern.
     """
     create_env_dir(env_path)
 
@@ -191,7 +188,7 @@ def main():
         "-f",
         "--finger-pattern",
         type=str,
-        help="String of '+' and '-' encoding the finger pattern",
+        help="Finger pattern string ('+'/'-' or '0'/'1' characters)",
     )
 
     parser.add_argument(

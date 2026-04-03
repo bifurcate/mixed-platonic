@@ -8,10 +8,23 @@ square and two triangles, glued internally along three edges::
 
 Adjacent fingers are connected by two edge pairings whose topology depends
 on whether consecutive entries in the finger pattern have the same or
-opposite sign (+1 / -1).  The sign encodes the orientation of the finger
+opposite value.  The binary value encodes the orientation of the finger
 relative to its neighbours.
 
-A ``FingerPattern`` is a cyclic list of +1/-1 values, one per finger.
+Finger pattern representations
+------------------------------
+All representations encode the same combinatorial data — a cyclic sequence
+of two distinct symbols — and are used in different contexts:
+
+- **{0, 1} integer list** (``FingerPattern``): the canonical internal
+  representation, used for cusp generation, bracelet enumeration, and
+  discrete calculus.  ``1`` = plus / positive, ``0`` = minus / negative.
+- **{'+', '-'} string**: user-facing I/O format, directory names, and
+  display.  Interchangeable with the integer list via ``to_finger_pattern_str``
+  and ``to_finger_pattern_list``.
+- **{'0', '1'} string**: alternative user input format, accepted by
+  ``parse_finger_pattern``.
+
 The ``FingerCuspGenerator`` builds a single connected cusp component from
 one pattern, while ``MultiFingerCuspGenerator`` handles the multi-cusp
 case by concatenating several patterns with an index offset.
@@ -28,21 +41,21 @@ from base import (
 from construction import Cusp
 
 FingerPattern = list[int]
-"""A cyclic sequence of +1/-1 values encoding finger orientations."""
+"""A cyclic sequence of 0/1 values encoding finger orientations (1=plus, 0=minus)."""
 
 
-def to_finger_pattern_str(finger_pattern: FingerPattern) -> str:
+def to_finger_pattern_str(finger_pattern: FingerPattern | tuple[int, ...]) -> str:
     """Encode a finger pattern as a compact string of ``+`` and ``-`` chars.
 
     Args:
-        finger_pattern: List of +1/-1 values.
+        finger_pattern: Sequence of 0/1 values.
 
     Returns:
         A string like ``"++--+"`` of the same length.
     """
     s = ""
     for x in finger_pattern:
-        if x == -1:
+        if x == 0:
             s += "-"
         else:
             s += "+"
@@ -56,26 +69,29 @@ def to_finger_pattern_list(finger_pattern_str: str) -> FingerPattern:
         finger_pattern_str: A string of ``+`` and ``-`` characters.
 
     Returns:
-        List of +1/-1 integers.
+        List of 0/1 integers (``'-'`` → 0, ``'+'`` → 1).
     """
     L: FingerPattern = []
     for x in finger_pattern_str:
         if x == "-":
-            L.append(-1)
+            L.append(0)
         else:
             L.append(1)
     return L
 
 
-def to_multi_finger_pattern_str(multi_finger_pattern: list[FingerPattern]) -> str:
+def to_multi_finger_pattern_str(
+    multi_finger_pattern: list[FingerPattern] | tuple[tuple[int, ...], ...],
+) -> str:
     """Encode a multi-cusp finger pattern as a pipe-delimited string.
 
     Each component's pattern is separated by ``|`` delimiters, e.g.
-    ``"|++--|-+|"`` for two components with patterns [+1,+1,-1,-1]
-    and [-1,+1].
+    ``"|++--|-+|"`` for two components with patterns [1,1,0,0]
+    and [0,1].
 
     Args:
-        multi_finger_pattern: List of finger patterns, one per cusp component.
+        multi_finger_pattern: Sequence of finger patterns, one per cusp
+            component.
 
     Returns:
         Pipe-delimited string representation.
@@ -84,12 +100,41 @@ def to_multi_finger_pattern_str(multi_finger_pattern: list[FingerPattern]) -> st
     for fp in multi_finger_pattern:
         s += "|"
         for x in fp:
-            if x == -1:
+            if x == 0:
                 s += "-"
             else:
                 s += "+"
     s += "|"
     return s
+
+
+def parse_finger_pattern(s: str) -> FingerPattern:
+    """Parse a finger pattern string in either ``{+,-}`` or ``{0,1}`` format.
+
+    Accepts two input conventions:
+    - Sign format: a string of ``'+'`` and ``'-'`` characters
+    - Binary format: a string of ``'0'`` and ``'1'`` characters
+
+    In both cases the returned list uses the canonical 0/1 representation
+    (``'+'`` / ``'1'`` → 1, ``'-'`` / ``'0'`` → 0).
+
+    Args:
+        s: A finger pattern string in either format.
+
+    Returns:
+        List of 0/1 integers.
+
+    Raises:
+        ValueError: If the string contains characters outside the
+            expected alphabet or mixes the two formats.
+    """
+    if all(c in "+-" for c in s):
+        return to_finger_pattern_list(s)
+    if all(c in "01" for c in s):
+        return [int(c) for c in s]
+    raise ValueError(
+        f"Finger pattern must consist of '+'/'-' or '0'/'1' characters, got: {s!r}"
+    )
 
 
 class FingerCuspGenerator:
@@ -99,12 +144,12 @@ class FingerCuspGenerator:
     ``Tri(2i)``, ``Tri(2i+1)`` — with internal edge pairings that form a
     strip.  Adjacent fingers are then connected with two more edge pairings
     whose topology depends on whether the neighbouring pattern entries share
-    the same sign ("positive" connection) or differ ("negative" connection).
+    the same value ("positive" connection) or differ ("negative" connection).
     The last finger wraps around to connect with the first.
 
     Attributes:
         cusp: The cusp tiling being populated.
-        finger_pattern: Cyclic list of +1/-1 orientation values.
+        finger_pattern: Cyclic list of 0/1 orientation values.
     """
 
     def __init__(self, cusp: Cusp, finger_pattern: FingerPattern) -> None:
@@ -246,7 +291,7 @@ class MultiFingerCuspGenerator:
 
     Attributes:
         cusp: The cusp tiling being populated (may contain multiple components).
-        multi_finger_pattern: List of finger patterns, one per cusp component.
+        multi_finger_pattern: List of finger patterns (0/1), one per cusp component.
         flattened: All finger entries concatenated, used for index calculations.
     """
 
@@ -336,7 +381,7 @@ class MultiFingerCuspGenerator:
         by the pattern.
 
         Args:
-            finger_pattern: The +1/-1 pattern for this component.
+            finger_pattern: The 0/1 pattern for this component.
             offset: Starting cell index for this component's fingers.
         """
         n = len(finger_pattern)

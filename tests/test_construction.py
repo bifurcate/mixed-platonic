@@ -34,14 +34,14 @@ from finger_cusp import FingerCuspGenerator
 
 @pytest.fixture
 def finger_ex_1():
-    finger_pattern = [1, -1, 1, -1]
+    finger_pattern = [1, 0, 1, 0]
     cusp = FingerCuspGenerator(finger_pattern).generate()
     return cusp
 
 
 @pytest.fixture
 def traversal_ex_1():
-    finger_pattern = [1, -1, 1, -1]
+    finger_pattern = [1, 0, 1, 0]
     traversal = list(FingerCuspGenerator(finger_pattern).traversal())
     return traversal
 
@@ -290,7 +290,7 @@ def test_get_manifold_face_pairing():
 @pytest.mark.xfail
 def test_construction_find_face_pairing():
 
-    finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
+    finger_pattern = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
     cusp = FingerCuspGenerator(finger_pattern).generate()
     embeddings = Embeddings()
 
@@ -327,7 +327,7 @@ def test_construction_find_face_pairing():
 
 @pytest.mark.xfail
 def test_construction_build_manifold_cellulation():
-    finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
+    finger_pattern = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
     cusp = FingerCuspGenerator(finger_pattern).generate()
     embeddings = Embeddings()
 
@@ -350,7 +350,7 @@ def test_construction_build_manifold_cellulation():
 @pytest.mark.xfail
 def test_construction_get_induced_embedding_1():
 
-    finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
+    finger_pattern = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
     cusp = FingerCuspGenerator(finger_pattern).generate()
 
     embeddings = Embeddings()
@@ -395,7 +395,7 @@ def test_construction_get_induced_embedding_1():
 @pytest.mark.xfail
 def test_get_induced_embedding_2():
 
-    finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
+    finger_pattern = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
     cusp = FingerCuspGenerator(finger_pattern).generate()
 
     embeddings = Embeddings()
@@ -435,7 +435,7 @@ def test_get_induced_embedding_2():
 
 @pytest.mark.xfail
 def test_get_induced_embedding_2():
-    finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
+    finger_pattern = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
     cusp = FingerCuspGenerator(finger_pattern).generate()
 
     embeddings = Embeddings()
@@ -456,7 +456,7 @@ def test_get_induced_embedding_2():
 
 @pytest.mark.xfail
 def test_get_induced_embedding_3():
-    finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
+    finger_pattern = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
     cusp = FingerCuspGenerator(finger_pattern).generate()
 
     embeddings = Embeddings()
@@ -469,7 +469,7 @@ def test_get_induced_embedding_3():
 
 @pytest.mark.xfail
 def test_complete_boyd():
-    finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
+    finger_pattern = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
     cusp = FingerCuspGenerator(finger_pattern).generate()
 
     embeddings = Embeddings()
@@ -631,7 +631,7 @@ def test_complete_boyd():
 
 @pytest.mark.xfail
 def test_empty_boyd():
-    finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
+    finger_pattern = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
     cusp = FingerCuspGenerator(finger_pattern).generate()
 
     def tr_gen(num_fingers):
@@ -687,7 +687,7 @@ def test_empty_boyd():
 
 
 def xtest_construction_get_embedding_by_cusp_cell_1():
-    finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
+    finger_pattern = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
     cusp = FingerCuspGenerator(finger_pattern).generate()
 
     embeddings = Embeddings()
@@ -712,7 +712,7 @@ def xtest_construction_get_embedding_by_cusp_cell_1():
 
 
 def xtest_construction_get_next_embedding_1():
-    finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
+    finger_pattern = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
     cusp = FingerCuspGenerator(finger_pattern).generate()
 
     def tr_gen(num_fingers):
@@ -741,7 +741,7 @@ def xtest_construction_get_next_embedding_1():
 
 
 def xtest_construction_get_next_embedding_2():
-    finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
+    finger_pattern = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
     cusp = FingerCuspGenerator(finger_pattern).generate()
 
     def tr_gen(num_fingers):
