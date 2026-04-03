@@ -122,27 +122,29 @@ The `draw.py` module can render cusp tilings with embedding annotations using py
 
 ```
 src/
-  base.py              Core data structures (cells, pairings, embeddings)
-  construction.py      Cusp tiling, embedding collection, constraint propagation
-  solver.py            Backtracking search with checkpoint/resume
-  finger_cusp.py       Finger pattern cusp generator
-  long_cusp.py         Long cusp pattern generator
-  env.py               Search environment I/O (config, state, checkpoints)
-  generate.py          CLI: create a single search environment
-  generate_census.py   CLI: create environments for all patterns of a given size
-  solve.py             CLI: run the solver (supports stop/resume)
-  solve_census.py      CLI: distributed worker that solves a census
-  analyze.py           CLI: extract Regina isomorphism signatures
-  analyze_census.py    CLI: report census status and completions
-  export_regina.py     Convert cellulations to Regina triangulations
-  draw.py              Cusp visualization (pycairo)
-  bracelets.py         Bracelet enumeration for pattern generation
-  examples.py          Example cusp configurations
+  base.py                 Core data structures (cells, pairings, embeddings)
+  construction.py         Cusp tiling, embedding collection, constraint propagation
+  solver.py               Backtracking search with checkpoint/resume
+  finger_cusp.py          Finger (short-meridian) cusp pattern generator
+  long_cusp.py            Long-meridian cusp pattern generator
+  bracelets.py            Bracelet/necklace enumeration over ±1 sequences
+  binary_loop.py          Discrete calculus on cyclic binary (mod 2) sequences
+  pattern_restriction.py  Octahedron signature constraints and multigraph enumeration
+  env.py                  Search environment I/O (config, state, checkpoints)
+  generate.py             CLI: create a single search environment
+  generate_census.py      CLI: create environments for all patterns of a given size
+  solve.py                CLI: run the solver (supports stop/resume)
+  solve_census.py         CLI: distributed worker that solves a census
+  analyze.py              CLI: extract Regina isomorphism signatures
+  analyze_census.py       CLI: report census status and completions
+  export_regina.py        Convert cellulations to Regina triangulations
+  draw.py                 Cusp visualization (pycairo)
+  examples.py             Example cusp configurations
 tests/
-  test_base.py         Tests for core data structures
-  test_construction.py Tests for construction and constraint propagation
-  test_finger_cusp.py  Tests for finger pattern generation
-  test_long_cusp.py    Tests for long cusp pattern generation
+  test_base.py            Tests for core data structures
+  test_construction.py    Tests for construction and constraint propagation
+  test_finger_cusp.py     Tests for finger pattern generation
+  test_long_cusp.py       Tests for long cusp pattern generation
 ```
 
 ## Testing
@@ -154,7 +156,7 @@ poetry run pytest tests/
 ## TODO
 
 - Fix up and add more tests
-- Document and clean up cusp generating dependencies
+- Integrate `pattern_restriction.py` into the census generation pipeline
 
 ## Author
 

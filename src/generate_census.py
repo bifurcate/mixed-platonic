@@ -7,13 +7,16 @@ a search environment for each one under a shared census directory.
 Supports three pattern types:
     - Finger patterns: ``-n <num_fingers>`` enumerates 2-bracelets of
       the given length.
-    - Multi-component finger patterns: used via ``generate_multi_census``.
+    - Multi-component finger patterns: ``-m <num_fingers>`` enumerates
+      multi-component 2-bracelets with the given number of fingers per
+      component.
     - Long cusp patterns: ``-l <max_length>`` enumerates long cusp
       sequences up to the given length.
 
 Usage:
-    poetry run python src/generate_census.py -n 2 my_census
-    poetry run python src/generate_census.py -l 3 my_census
+    poetry run python src/generate_census.py -n 12 my_census
+    poetry run python src/generate_census.py -m 6 my_census
+    poetry run python src/generate_census.py -l 16 my_census
 """
 
 import argparse
@@ -75,6 +78,13 @@ def main():
     )
 
     parser.add_argument(
+        "-m",
+        "--multi-fingers",
+        type=int,
+        help="Number of fingers per component for multi-component patterns",
+    )
+
+    parser.add_argument(
         "-l", "--long-cusp", type=int, help="Maximum length of long cusp pattern"
     )
 
@@ -97,6 +107,12 @@ def main():
             fp_str = to_finger_pattern_str(fp)
             env_path = census_root / fp_str
             generate(env_path, fp)
+
+    elif args.multi_fingers:
+        for mfp in generate_multi_2_bracelets(args.multi_fingers):
+            mfp_str = to_multi_finger_pattern_str(mfp)
+            env_path = census_root / mfp_str
+            generate_multi(env_path, mfp)
 
     elif args.long_cusp:
         for cs in build_cusp_sequences(args.long_cusp):
