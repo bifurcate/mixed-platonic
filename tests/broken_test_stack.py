@@ -10,7 +10,7 @@ from base import (
 )
 
 from construction import (
-    FingerCuspGenerator,
+    FingerCuspConstructor,
     Embeddings,
     Construction,
 )
@@ -29,9 +29,9 @@ from draw import draw_stack
 #   num_tets = 6
 #   num_octs = 2
 #   finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
-#   cusp_generator = FingerCuspGenerator(finger_pattern)
-#   cusp = cusp_generator.generate()
-#   traversal = list(cusp_generator.traversal())
+#   cusp_constructor = FingerCuspConstructor(finger_pattern)
+#   cusp = cusp_constructor.generate()
+#   traversal = list(cusp_constructor.traversal())
 #   embeddings = Embeddings()
 #   construction = Construction(cusp, embeddings)
 #   stack = Stack(traversal, construction, num_tets, num_octs)

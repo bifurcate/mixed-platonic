@@ -20,7 +20,7 @@ from construction import (
     CHOICE,
     INDUCED,
     Cusp,
-    FingerCuspGenerator,
+    FingerCuspConstructor,
     Embeddings,
     get_manifold_face_pairing,
     get_embedding_tgt,
@@ -134,9 +134,9 @@ def xtest_to_regina_triangulation():
     ]
     # finger_pattern = [1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1]
     cusp = Cusp()
-    cusp_generator = FingerCuspGenerator(cusp, finger_pattern)
-    cusp = cusp_generator.generate()
-    traversal = list(cusp_generator.traversal())
+    cusp_constructor = FingerCuspConstructor(cusp, finger_pattern)
+    cusp = cusp_constructor.generate()
+    traversal = list(cusp_constructor.traversal())
 
     # # boyd_init
     # # init_tri_indices = (0,1,2,4,5,6)

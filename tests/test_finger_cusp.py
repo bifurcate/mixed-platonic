@@ -10,19 +10,19 @@ from base import (
 from construction import Cusp
 
 from finger_cusp import (
-    FingerCuspGenerator,
-    MultiFingerCuspGenerator,
+    FingerCuspConstructor,
+    MultiFingerCuspConstructor,
 )
 
 
-def test_finger_cusp_generator_add_finger():
+def test_finger_cusp_constructor_add_finger():
     cusp = Cusp()
     finger_pattern = [1, 0]
-    cusp_generator = FingerCuspGenerator(cusp, finger_pattern)
+    cusp_constructor = FingerCuspConstructor(cusp, finger_pattern)
 
-    cusp_generator.add_finger(0)
+    cusp_constructor.add_finger(0)
 
-    cusp = cusp_generator.cusp
+    cusp = cusp_constructor.cusp
 
     pairings = cusp.get_cell_pairings(Sqr(0))
 
@@ -61,15 +61,15 @@ def test_finger_cusp_generator_add_finger():
     )
 
 
-def test_finger_cusp_generator_generate():
+def test_finger_cusp_constructor_generate():
     cusp = Cusp()
     finger_pattern = [1, 0]
-    cusp_generator = FingerCuspGenerator(cusp, finger_pattern)
-    cusp_generator.generate()
+    cusp_constructor = FingerCuspConstructor(cusp, finger_pattern)
+    cusp_constructor.generate()
 
 
-def test_multi_finger_cusp_generator_generate():
+def test_multi_finger_cusp_constructor_generate():
     cusp = Cusp()
     multi_finger_pattern = [[1, 0], [1, 0]]
-    cusp_generator = MultiFingerCuspGenerator(cusp, multi_finger_pattern)
-    cusp_generator.generate()
+    cusp_constructor = MultiFingerCuspConstructor(cusp, multi_finger_pattern)
+    cusp_constructor.generate()

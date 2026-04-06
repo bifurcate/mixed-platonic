@@ -1,4 +1,4 @@
-"""Generate search environments from cusp patterns.
+"""Construct search environments from cusp patterns.
 
 Creates a search environment directory for a single cusp tiling. The cusp
 pattern can be specified as a finger pattern (string of '+' and '-') or a
@@ -6,8 +6,8 @@ long cusp pattern string. The environment is written to disk and left in
 the "init" state, ready for the solver.
 
 Usage:
-    poetry run python src/generate.py -f '++--++--++--' my_env
-    poetry run python src/generate.py -l 'ebdcebdccc' my_env
+    poetry run python src/construct.py -f '++--++--++--' my_env
+    poetry run python src/construct.py -l 'ebdcebdccc' my_env
 """
 
 import argparse
@@ -16,12 +16,12 @@ from pathlib import Path
 
 from construction import Cusp
 from finger_cusp import (
-    FingerCuspGenerator,
+    FingerCuspConstructor,
     FingerPattern,
-    MultiFingerCuspGenerator,
+    MultiFingerCuspConstructor,
     parse_finger_pattern,
 )
-from long_cusp import LongCuspGenerator
+from long_cusp import LongCuspConstructor
 from env import (
     create_env_dir,
     write_config,
@@ -82,9 +82,9 @@ def generate_config_from_finger_pattern(env_path, finger_pattern):
         finger_pattern: List of 0/1 values encoding the finger pattern.
     """
     cusp = Cusp()
-    cusp_generator = FingerCuspGenerator(cusp, finger_pattern)
-    cusp = cusp_generator.generate()
-    traversal = list(cusp_generator.traversal())
+    cusp_constructor = FingerCuspConstructor(cusp, finger_pattern)
+    cusp = cusp_constructor.generate()
+    traversal = list(cusp_constructor.traversal())
     num_tets, num_octs = determine_num_tets_octs(finger_pattern)
 
     write_config(env_path, num_tets, num_octs, cusp, traversal)
@@ -104,10 +104,10 @@ def generate_config_from_long_cusp_pattern(env_path, long_cusp_pattern):
     create_env_dir(env_path)
 
     cusp = Cusp()
-    cusp_generator = LongCuspGenerator(cusp, long_cusp_pattern)
-    cusp = cusp_generator.generate()
-    traversal = list(cusp_generator.traversal())
-    num_tris, num_sqrs = cusp_generator.get_num_polys()
+    cusp_constructor = LongCuspConstructor(cusp, long_cusp_pattern)
+    cusp = cusp_constructor.generate()
+    traversal = list(cusp_constructor.traversal())
+    num_tris, num_sqrs = cusp_constructor.get_num_polys()
     if num_tris % 4 != 0:
         logging.error("num tris must be a multiple of 4")
         exit(1)
@@ -166,10 +166,10 @@ def generate_config_from_multi_finger_pattern(env_path, multi_finger_pattern):
         multi_finger_pattern: List of finger patterns, one per component.
     """
     cusp = Cusp()
-    cusp_generator = MultiFingerCuspGenerator(cusp, multi_finger_pattern)
-    cusp_generator.generate()
-    traversal = list(cusp_generator.traversal())
-    num_tets, num_octs = determine_num_tets_octs(cusp_generator.flattened)
+    cusp_constructor = MultiFingerCuspConstructor(cusp, multi_finger_pattern)
+    cusp_constructor.generate()
+    traversal = list(cusp_constructor.traversal())
+    num_tets, num_octs = determine_num_tets_octs(cusp_constructor.flattened)
     write_config(env_path, num_tets, num_octs, cusp, traversal)
 
 

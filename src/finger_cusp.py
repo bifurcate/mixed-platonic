@@ -1,4 +1,4 @@
-"""Cusp cellulation generators for the short-meridian (finger) case.
+"""Cusp cellulation constructors for the short-meridian (finger) case.
 
 In the short-meridian family, each cusp tiling is built from repeating
 "finger" units arranged cyclically.  A single finger consists of one
@@ -25,8 +25,8 @@ of two distinct symbols — and are used in different contexts:
 - **{'0', '1'} string**: alternative user input format, accepted by
   ``parse_finger_pattern``.
 
-The ``FingerCuspGenerator`` builds a single connected cusp component from
-one pattern, while ``MultiFingerCuspGenerator`` handles the multi-cusp
+The ``FingerCuspConstructor`` builds a single connected cusp component from
+one pattern, while ``MultiFingerCuspConstructor`` handles the multi-cusp
 case by concatenating several patterns with an index offset.
 """
 
@@ -137,7 +137,7 @@ def parse_finger_pattern(s: str) -> FingerPattern:
     )
 
 
-class FingerCuspGenerator:
+class FingerCuspConstructor:
     """Build a single connected cusp tiling from a cyclic finger pattern.
 
     Each finger at index *i* creates three cusp cells — ``Sqr(i)``,
@@ -282,7 +282,7 @@ class FingerCuspGenerator:
             yield Tri(2 * i + 1)
 
 
-class MultiFingerCuspGenerator:
+class MultiFingerCuspConstructor:
     """Build a (possibly disconnected) multi-cusp tiling from several finger patterns.
 
     Each finger pattern in the list produces one connected cusp component.
@@ -305,7 +305,7 @@ class MultiFingerCuspGenerator:
     def add_finger(self, idx: int) -> None:
         """Create the three cusp cells for finger *idx* and pair them internally.
 
-        Identical to ``FingerCuspGenerator.add_finger``; the *idx* value
+        Identical to ``FingerCuspConstructor.add_finger``; the *idx* value
         includes the component offset so cell indices are globally unique.
 
         Args:

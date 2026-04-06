@@ -10,18 +10,18 @@ from base import (
 from construction import Cusp
 
 from long_cusp import (
-    LongCuspGenerator,
+    LongCuspConstructor,
     get_poly_count,
     next_seq_gen,
 )
 
 
-def test_long_cusp_generator_generate():
+def test_long_cusp_constructor_generate():
     cusp = Cusp()
     pattern = "ebdcc" * 2
-    cusp_generator = LongCuspGenerator(cusp, pattern)
+    cusp_constructor = LongCuspConstructor(cusp, pattern)
 
-    cusp_generator.generate()
+    cusp_constructor.generate()
 
 
 def test_get_poly_count():

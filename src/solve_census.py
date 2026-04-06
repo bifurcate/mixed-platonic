@@ -11,13 +11,16 @@ the worker releases its claim on the current environment so that another
 worker (or a restarted instance) can pick it up and resume from the
 checkpoint.
 
+If the census directory contains a ``manifest.json`` (copied there by
+``construct_census.py``), environments are visited in manifest order so
+that earlier patterns are solved first.  Otherwise falls back to
+filesystem directory order.
+
 Usage:
     poetry run python src/solve_census.py my_census
-
-Run multiple workers in parallel (e.g. in separate terminals or via a
-job scheduler) pointing at the same census directory.
 """
 
+import json
 import os
 import argparse
 from pathlib import Path
@@ -59,19 +62,36 @@ def release_claim(work_dir: Path):
     claim_marker.unlink(missing_ok=True)
 
 
-def claim_dir(census_dir) -> Path:
-    """Find and claim the next unclaimed environment in the census.
-
-    Iterates subdirectories and returns the first one that has neither
-    a .claimed nor a .done marker. Returns None if all are claimed or done.
+def env_dirs_from_manifest(census_dir: Path, manifest_path: str) -> list[Path]:
+    """Return environment directories in manifest order.
 
     Args:
         census_dir: Path to the census root directory.
+        manifest_path: Path to the manifest JSON file.
+
+    Returns:
+        List of environment directory paths, in manifest order.
+    """
+    with open(manifest_path) as f:
+        manifest = json.load(f)
+    return [census_dir / pattern for pattern in manifest["patterns"]]
+
+
+def claim_dir(census_dir: Path, ordering: list[Path] | None = None) -> Path | None:
+    """Find and claim the next unclaimed environment in the census.
+
+    When *ordering* is provided, directories are visited in that order.
+    Otherwise falls back to ``iterdir()`` order.
+
+    Args:
+        census_dir: Path to the census root directory.
+        ordering: Optional explicit list of directories to try, in order.
 
     Returns:
         Path to the claimed directory, or None if no work remains.
     """
-    for d in census_dir.iterdir():
+    candidates = ordering if ordering is not None else census_dir.iterdir()
+    for d in candidates:
         if not d.is_dir():
             continue
         if (d / CLAIM_FILE).exists() or (d / DONE_FILE).exists():
@@ -110,8 +130,13 @@ def main():
     args = parser.parse_args()
     census_dir = Path(args.census_dir)
 
+    manifest_path = census_dir / "manifest.json"
+    ordering = None
+    if manifest_path.exists():
+        ordering = env_dirs_from_manifest(census_dir, manifest_path)
+
     while True:
-        work_dir = claim_dir(census_dir)
+        work_dir = claim_dir(census_dir, ordering)
         if work_dir is None:
             print(f"[{os.getpid()}] No more work, exiting", flush=True)
             break

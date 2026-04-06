@@ -55,13 +55,13 @@ See the [Regina installation guide](https://regina-normal.github.io/install/) fo
 Create a search environment from a finger pattern:
 
 ```sh
-poetry run python src/generate.py -f "+-+-+-+-+-+-" my_search
+poetry run python src/construct.py -f "+-+-+-+-+-+-" my_search
 ```
 
 Or from a long cusp pattern:
 
 ```sh
-poetry run python src/generate.py -l "a" my_search
+poetry run python src/construct.py -l "a" my_search
 ```
 
 This creates a directory (`my_search/`) containing `config.json` and `state.json`.
@@ -97,19 +97,33 @@ poetry run python src/analyze.py -i my_search
 
 ### Census workflow
 
-A census automates the generate-solve-analyze pipeline across all distinct
-cusp patterns of a given size:
+A census automates the generate-construct-solve-analyze pipeline across all
+distinct cusp patterns of a given size:
 
 ```sh
-# Generate all finger-pattern environments with 12 fingers
-poetry run python src/generate_census.py -n 12 my_census
+# 1. Generate a manifest of all finger patterns with 12 fingers
+poetry run python src/generate_census.py -n 12 my_manifest.json
 
-# Solve all environments (run multiple workers in parallel)
+# 2. Construct solver environments from the manifest
+#    (also copies the manifest into the census directory as manifest.json)
+poetry run python src/construct_census.py my_manifest.json my_census
+
+# 3. Solve all environments (run multiple workers in parallel)
 poetry run python src/solve_census.py my_census
 
-# Report census status and list environments with completions
+# 4. Report census status and list environments with completions
 poetry run python src/analyze_census.py my_census
 ```
+
+`generate_census.py` supports three pattern types:
+- `-n <num_fingers>` — finger patterns (2-bracelets of the given length)
+- `-m <num_fingers>` — multi-component finger patterns
+- `-l <max_length>` — long cusp sequences
+
+`construct_census.py` copies the manifest into the census directory as
+`manifest.json`. When `solve_census.py` finds this file, it visits
+environments in manifest order so earlier patterns are solved first.
+Without a manifest, it falls back to filesystem directory order.
 
 Multiple `solve_census.py` workers can run concurrently against the same
 census directory — a file-based claiming protocol prevents duplicated work.
@@ -125,14 +139,15 @@ src/
   base.py                 Core data structures (cells, pairings, embeddings)
   construction.py         Cusp tiling, embedding collection, constraint propagation
   solver.py               Backtracking search with checkpoint/resume
-  finger_cusp.py          Finger (short-meridian) cusp pattern generator
-  long_cusp.py            Long-meridian cusp pattern generator
+  finger_cusp.py          Finger (short-meridian) cusp pattern constructor
+  long_cusp.py            Long-meridian cusp pattern constructor
   bracelets.py            Bracelet/necklace enumeration over ±1 sequences
   binary_loop.py          Discrete calculus on cyclic binary (mod 2) sequences
   pattern_restriction.py  Octahedron signature constraints and multigraph enumeration
   env.py                  Search environment I/O (config, state, checkpoints)
-  generate.py             CLI: create a single search environment
-  generate_census.py      CLI: create environments for all patterns of a given size
+  construct.py            CLI: create a single search environment
+  generate_census.py      CLI: enumerate patterns and write a census manifest
+  construct_census.py     CLI: build environments from a census manifest
   solve.py                CLI: run the solver (supports stop/resume)
   solve_census.py         CLI: distributed worker that solves a census
   analyze.py              CLI: extract Regina isomorphism signatures

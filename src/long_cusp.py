@@ -1,4 +1,4 @@
-"""Cusp cellulation generators for the long-meridian case.
+"""Cusp cellulation constructors for the long-meridian case.
 
 In the long-meridian family, each cusp tiling is described by a cyclic
 sequence of strip labels drawn from the alphabet ``{a, b, c, d, e}``.
@@ -561,7 +561,7 @@ def build_cusp_sequences(n: int) -> list[LongCuspPattern]:
     return c_seqs
 
 
-class LongCuspGenerator:
+class LongCuspConstructor:
     """Build a connected cusp tiling from a cyclic long-cusp pattern string.
 
     The generator processes the pattern in two passes:

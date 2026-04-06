@@ -73,7 +73,7 @@ class Cusp:
             pairings, keyed by ``EdgeSpec``. Contains both the forward
             and inverse direction of every pairing.
         pairs: Ordered list of edge pairings (forward direction only),
-            preserving the insertion order from the cusp generator.
+            preserving the insertion order from the cusp constructor.
     """
 
     def __init__(self) -> None:

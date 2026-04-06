@@ -1,7 +1,7 @@
 import pytest
 
 from construction import Cusp, Embeddings, Construction
-from finger_cusp import FingerCuspGenerator
+from finger_cusp import FingerCuspConstructor
 from solver import Solver, StackFrame
 
 FINGER_PATTERN = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
@@ -12,9 +12,9 @@ NUM_OCTS = 2
 def make_solver():
     """Build a Solver for the Boyd finger pattern."""
     cusp = Cusp()
-    gen = FingerCuspGenerator(cusp, FINGER_PATTERN)
-    cusp = gen.generate()
-    traversal = list(gen.traversal())
+    con = FingerCuspConstructor(cusp, FINGER_PATTERN)
+    cusp = con.generate()
+    traversal = list(con.traversal())
     embeddings = Embeddings()
     construction = Construction(cusp, embeddings)
     return Solver(traversal, construction, NUM_TETS, NUM_OCTS), traversal

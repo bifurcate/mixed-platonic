@@ -29,20 +29,20 @@ from construction import (
     DISTINCT_INDUCED_EMBEDDINGS,
 )
 
-from finger_cusp import FingerCuspGenerator
+from finger_cusp import FingerCuspConstructor
 
 
 @pytest.fixture
 def finger_ex_1():
     finger_pattern = [1, 0, 1, 0]
-    cusp = FingerCuspGenerator(finger_pattern).generate()
+    cusp = FingerCuspConstructor(finger_pattern).generate()
     return cusp
 
 
 @pytest.fixture
 def traversal_ex_1():
     finger_pattern = [1, 0, 1, 0]
-    traversal = list(FingerCuspGenerator(finger_pattern).traversal())
+    traversal = list(FingerCuspConstructor(finger_pattern).traversal())
     return traversal
 
 
@@ -291,7 +291,7 @@ def test_get_manifold_face_pairing():
 def test_construction_find_face_pairing():
 
     finger_pattern = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
-    cusp = FingerCuspGenerator(finger_pattern).generate()
+    cusp = FingerCuspConstructor(finger_pattern).generate()
     embeddings = Embeddings()
 
     embeddings.add_embedding(OctSqrEmbedding(Oct(0), Sqr(0), (0, 1, 2, 3, 4, 5)))
@@ -328,7 +328,7 @@ def test_construction_find_face_pairing():
 @pytest.mark.xfail
 def test_construction_build_manifold_cellulation():
     finger_pattern = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
-    cusp = FingerCuspGenerator(finger_pattern).generate()
+    cusp = FingerCuspConstructor(finger_pattern).generate()
     embeddings = Embeddings()
 
     embeddings.add_embedding(OctSqrEmbedding(Oct(0), Sqr(0), (0, 1, 2, 3, 4, 5)))
@@ -351,7 +351,7 @@ def test_construction_build_manifold_cellulation():
 def test_construction_get_induced_embedding_1():
 
     finger_pattern = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
-    cusp = FingerCuspGenerator(finger_pattern).generate()
+    cusp = FingerCuspConstructor(finger_pattern).generate()
 
     embeddings = Embeddings()
 
@@ -396,7 +396,7 @@ def test_construction_get_induced_embedding_1():
 def test_get_induced_embedding_2():
 
     finger_pattern = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
-    cusp = FingerCuspGenerator(finger_pattern).generate()
+    cusp = FingerCuspConstructor(finger_pattern).generate()
 
     embeddings = Embeddings()
 
@@ -436,7 +436,7 @@ def test_get_induced_embedding_2():
 @pytest.mark.xfail
 def test_get_induced_embedding_2():
     finger_pattern = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
-    cusp = FingerCuspGenerator(finger_pattern).generate()
+    cusp = FingerCuspConstructor(finger_pattern).generate()
 
     embeddings = Embeddings()
 
@@ -457,7 +457,7 @@ def test_get_induced_embedding_2():
 @pytest.mark.xfail
 def test_get_induced_embedding_3():
     finger_pattern = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
-    cusp = FingerCuspGenerator(finger_pattern).generate()
+    cusp = FingerCuspConstructor(finger_pattern).generate()
 
     embeddings = Embeddings()
 
@@ -470,7 +470,7 @@ def test_get_induced_embedding_3():
 @pytest.mark.xfail
 def test_complete_boyd():
     finger_pattern = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
-    cusp = FingerCuspGenerator(finger_pattern).generate()
+    cusp = FingerCuspConstructor(finger_pattern).generate()
 
     embeddings = Embeddings()
 
@@ -632,7 +632,7 @@ def test_complete_boyd():
 @pytest.mark.xfail
 def test_empty_boyd():
     finger_pattern = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
-    cusp = FingerCuspGenerator(finger_pattern).generate()
+    cusp = FingerCuspConstructor(finger_pattern).generate()
 
     def tr_gen(num_fingers):
         for i in range(num_fingers):
@@ -688,7 +688,7 @@ def test_empty_boyd():
 
 def xtest_construction_get_embedding_by_cusp_cell_1():
     finger_pattern = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
-    cusp = FingerCuspGenerator(finger_pattern).generate()
+    cusp = FingerCuspConstructor(finger_pattern).generate()
 
     embeddings = Embeddings()
 
@@ -713,7 +713,7 @@ def xtest_construction_get_embedding_by_cusp_cell_1():
 
 def xtest_construction_get_next_embedding_1():
     finger_pattern = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
-    cusp = FingerCuspGenerator(finger_pattern).generate()
+    cusp = FingerCuspConstructor(finger_pattern).generate()
 
     def tr_gen(num_fingers):
         for i in range(num_fingers):
@@ -742,7 +742,7 @@ def xtest_construction_get_next_embedding_1():
 
 def xtest_construction_get_next_embedding_2():
     finger_pattern = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0]
-    cusp = FingerCuspGenerator(finger_pattern).generate()
+    cusp = FingerCuspConstructor(finger_pattern).generate()
 
     def tr_gen(num_fingers):
         for i in range(num_fingers):
