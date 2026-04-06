@@ -6,9 +6,6 @@ and 1s with mod-2 arithmetic:
     - ``integrate`` / ``differentiate``: discrete antiderivative and derivative.
     - ``binary_tuples_of_weight``: enumerate all binary tuples with a given
       Hamming weight.
-    - ``hamming_weight``: count the number of 1s in a binary sequence.
-    - ``has_rotational_symmetry``: test whether a binary sequence is invariant
-      under a given cyclic shift.
 """
 
 from itertools import combinations
@@ -94,37 +91,3 @@ def binary_tuples_of_weight(n: int, k: int) -> list[BinaryLoop]:
     return tuples
 
 
-def hamming_weight(binary_seq: list[int] | tuple[int, ...]) -> int:
-    """Return the Hamming weight (number of 1s) of a binary sequence.
-
-    Args:
-        binary_seq: A binary sequence (list or tuple of 0s and 1s).
-
-    Returns:
-        The count of 1s.
-    """
-    return sum(binary_seq)
-
-
-def has_rotational_symmetry(binary_seq: list[int] | tuple[int, ...], n: int) -> bool:
-    """Check if a binary sequence is invariant under a right-shift of *n* positions.
-
-    Args:
-        binary_seq: A binary sequence (list or tuple).
-        n: Number of positions to right-shift.
-
-    Returns:
-        True if shifting *binary_seq* right by *n* yields the same sequence.
-    """
-    length = len(binary_seq)
-    if length == 0:
-        return True
-
-    n = n % length
-
-    if n == 0:
-        return True
-
-    rotated = binary_seq[-n:] + binary_seq[:-n]
-
-    return rotated == binary_seq

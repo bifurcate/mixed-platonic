@@ -27,7 +27,6 @@ Public API:
 from collections.abc import Iterator
 from itertools import (
     product,
-    combinations,
     combinations_with_replacement,
 )
 
@@ -66,41 +65,6 @@ def all_reflections(seq: BinarySeq) -> list[BinarySeq]:
     """Return all rotations of *seq* and of its reversal (2n total)."""
     reflected = seq[::-1]
     return all_rotations(seq) + all_rotations(reflected)
-
-
-def equivalence_class(seq: BinarySeq) -> set[BinarySeq]:
-    """Return the full bracelet equivalence class of *seq*.
-
-    Includes all rotations and reflections of both *seq* and its complement,
-    giving the orbit under the dihedral group combined with bitwise complement.
-    """
-    complemented = complement(seq)
-    return set(all_reflections(seq) + all_reflections(complemented))
-
-
-def balanced_sequences(n: int) -> list[BinarySeq]:
-    """Generate all 0/1 sequences of length *n* with equal counts of 0 and 1.
-
-    Args:
-        n: Sequence length; must be even.
-
-    Returns:
-        List of all balanced sequences (n/2 entries of each value), or an
-        empty list if *n* is odd.
-    """
-    if n % 2 != 0:
-        return []
-
-    k = n // 2
-    result: list[BinarySeq] = []
-
-    for one_positions in combinations(range(n), k):
-        s = [0] * n
-        for i in one_positions:
-            s[i] = 1
-        result.append(tuple(s))
-
-    return result
 
 
 def _candidates(seq: BinarySeq, with_complement: bool) -> list[BinarySeq]:

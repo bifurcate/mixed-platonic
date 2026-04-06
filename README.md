@@ -116,9 +116,12 @@ poetry run python src/analyze_census.py my_census
 ```
 
 `generate_census.py` supports three pattern types:
-- `-n <num_fingers>` — finger patterns (2-bracelets of the given length)
-- `-m <num_fingers>` — multi-component finger patterns
+- `-n <num_fingers>` — finger patterns (enumerated via octahedron face-pairing constraints)
+- `-m <num_fingers>` — multi-component finger patterns (bracelets with complement symmetry)
 - `-l <max_length>` — long cusp sequences
+
+Patterns can be sorted by complexity (`-s compression` or `-s entropy`),
+defaulting to least-complex first (use `-r` to reverse).
 
 `construct_census.py` copies the manifest into the census directory as
 `manifest.json`. When `solve_census.py` finds this file, it visits
@@ -141,9 +144,9 @@ src/
   solver.py               Backtracking search with checkpoint/resume
   finger_cusp.py          Finger (short-meridian) cusp pattern constructor
   long_cusp.py            Long-meridian cusp pattern constructor
-  bracelets.py            Bracelet/necklace enumeration over ±1 sequences
+  bracelets.py            Bracelet/necklace enumeration (rotation, reflection, optional complement)
   binary_loop.py          Discrete calculus on cyclic binary (mod 2) sequences
-  pattern_restriction.py  Octahedron signature constraints and multigraph enumeration
+  pattern_restriction.py  Short-meridian pattern enumeration via rank spectrum
   env.py                  Search environment I/O (config, state, checkpoints)
   construct.py            CLI: create a single search environment
   generate_census.py      CLI: enumerate patterns and write a census manifest
@@ -171,7 +174,6 @@ poetry run pytest tests/
 ## TODO
 
 - Fix up and add more tests
-- Integrate `pattern_restriction.py` into the census generation pipeline
 
 ## Author
 

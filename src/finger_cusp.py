@@ -7,9 +7,23 @@ square and two triangles, glued internally along three edges::
     Sqr(i) -- Tri(2i) -- Tri(2i+1) -- (back to Sqr(i))
 
 Adjacent fingers are connected by two edge pairings whose topology depends
-on whether consecutive entries in the finger pattern have the same or
-opposite value.  The binary value encodes the orientation of the finger
-relative to its neighbours.
+on whether consecutive entries in the orientation string have the same or
+opposite value.
+
+Terminology note
+----------------
+The thesis defines three levels of binary string (see
+``pattern_restriction`` for the full hierarchy):
+
+- **Orientation string** ``s``: each entry is the orientation (0 or 1) of
+  a finger.  This is what the code calls the "finger pattern" and what
+  ``FingerCuspConstructor`` consumes to build the cusp tiling.
+- **Boundary string** ``f`` (called "finger pattern" in the thesis):
+  ``f = differentiate(s)``, encoding stay/switch at each finger boundary.
+- **Rank string**: ``differentiate(f)``.
+
+In code, "finger pattern" refers to the orientation string ``s``.  In the
+thesis, "finger pattern" refers to the boundary string ``f``.
 
 Finger pattern representations
 ------------------------------
@@ -17,7 +31,7 @@ All representations encode the same combinatorial data — a cyclic sequence
 of two distinct symbols — and are used in different contexts:
 
 - **{0, 1} integer list** (``FingerPattern``): the canonical internal
-  representation, used for cusp generation, bracelet enumeration, and
+  representation, used for cusp construction, bracelet enumeration, and
   discrete calculus.  ``1`` = plus / positive, ``0`` = minus / negative.
 - **{'+', '-'} string**: user-facing I/O format, directory names, and
   display.  Interchangeable with the integer list via ``to_finger_pattern_str``

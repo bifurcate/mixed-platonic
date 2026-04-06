@@ -1,15 +1,30 @@
 """Restrict cusp pattern enumeration using octahedron structural constraints.
 
-This module provides tools to prune the space of finger patterns by
-exploiting structural constraints from octahedron decompositions.  The
-key idea: each octahedron contributes a characteristic "type vector"
-``(a, b, c)`` counting how its six square cusp cells distribute across
-three edge-pairing categories.
+This module prunes the space of short-meridian cusp patterns by
+exploiting structural constraints from octahedron decompositions.
 
-The primary entry point is ``generate_short_cusp(n)``, which enumerates
-all valid finger patterns of length *n* by computing the achievable rank
-spectrum from non-isomorphic octahedral face-pairing multigraphs, then
-constructing patterns for each rank via integer partitions.
+Terminology and binary string hierarchy
+----------------------------------------
+The short-meridian cusp cellulation is encoded by three levels of cyclic
+binary string, each related by mod-2 discrete differentiation/integration
+(see ``binary_loop``):
+
+- **Orientation string** ``s``: each entry is the orientation (0 or 1)
+  of the corresponding finger.  Two orientation strings that are
+  bitwise complements produce the same cusp cellulation.
+- **Boundary string** ``f``: ``f_i = (s_i + s_{i+1}) mod 2``, i.e.
+  ``f = differentiate(s)``.  Entry 0 = stay (same-orientation neighbours),
+  1 = switch (opposite-orientation neighbours).  The thesis calls this
+  the "finger pattern"; in code, equivalence classes of ``f`` under
+  rotation and reversal are bracelets (no complement symmetry needed,
+  since complementing ``s`` leaves ``f`` unchanged).
+- **Rank string**: ``differentiate(f)``, one more derivative.  Its
+  Hamming weight is the *rank* of the pattern.
+
+The primary entry point is ``generate_short_cusp(n)``, which works
+bottom-up: enumerate achievable ranks from the octahedron face-pairing
+multigraph, construct rank strings for each rank, then integrate twice
+to recover orientation strings.
 
 Additionally, ``generate_balanced_patterns`` provides a simpler
 combinatorial approach using balanced binary tuples reduced to bracelets.
@@ -27,17 +42,21 @@ from bracelets import BinarySeq, to_canonical, reduce_to_bracelets
 from binary_loop import binary_tuples_of_weight, integrate
 
 # Each octahedron has 6 square cusp cells.  A type vector ``(a, b, c)``
-# records how those 6 squares distribute across three edge-pairing
-# categories.  The entries always sum to 6.
+# records how those 6 squares distribute across three square tile type
+# categories.  The columns correspond to:
+#   a = OTTT  (square bordered by 3 oct-tet and 1 tet-tet edges)
+#   b = TTTT  (square bordered by 4 tet-tet edges)
+#   c = OTOT  (square bordered by 2 oct-tet and 2 tet-tet edges, alternating)
+# The entries always sum to 6.
 OctTypeVector = tuple[int, int, int]
 
 OCT_TYPE_VECTORS: list[OctTypeVector] = [
-    (3, 3, 0),
-    (3, 0, 3),
-    (4, 1, 1),
-    (0, 6, 0),
-    (0, 0, 6),
-    (6, 0, 0),
+    (3, 3, 0),  # OTTT=3, TTTT=3, OTOT=0
+    (3, 0, 3),  # OTTT=3, TTTT=0, OTOT=3
+    (4, 1, 1),  # OTTT=4, TTTT=1, OTOT=1
+    (0, 6, 0),  # OTTT=0, TTTT=6, OTOT=0
+    (0, 0, 6),  # OTTT=0, TTTT=0, OTOT=6
+    (6, 0, 0),  # OTTT=6, TTTT=0, OTOT=0
 ]
 
 
@@ -151,15 +170,19 @@ def pattern_from_parts(
 
 
 def patterns_for_rank(n: int, r: int) -> set[BinarySeq]:
-    """Enumerate all canonical binary patterns of length *n* with rank *r*.
+    """Enumerate all canonical rank strings of length *n* with rank *r*.
 
-    Distributes ``(n - r) / 2`` zeros across ``r / 2`` odd and even slots
-    via integer partitions, then builds and canonicalizes all resulting
-    patterns.
+    The *rank* of a boundary string ``f`` is the Hamming weight of its
+    derivative ``differentiate(f)``—equivalently, the number of 1s in
+    the rank string.  This function constructs all canonical binary
+    sequences of length *n* with exactly *r* ones by distributing
+    ``(n - r) / 2`` zeros across ``r / 2`` odd and even slots via
+    integer partitions.
 
     Args:
-        n: Total pattern length.
-        r: Rank (must have same parity as *n*; ``r / 2`` must be integral).
+        n: Total pattern length (number of fingers).
+        r: Rank — Hamming weight of the rank string.  Must have the same
+            parity as *n*; ``r / 2`` must be integral.
 
     Returns:
         Set of canonical binary sequences.
@@ -178,18 +201,47 @@ def patterns_for_rank(n: int, r: int) -> set[BinarySeq]:
 
 
 def generate_short_cusp(n: int) -> Iterator[tuple[int, ...]]:
-    """Yield all finger patterns of length *n* using octahedral face pairing graph and pattern_rank"""
+    """Yield all orientation strings of length *n* for short-meridian cusps.
+
+    Works bottom-up through the binary string hierarchy:
+
+    1. **Rank spectrum.**  The octahedron face-pairing multigraph has
+       ``v = e = n/6`` (one vertex per octahedron; ``sum(deg) = 2·n_oct``
+       is a theoretical result for mixed-platonic manifolds).  Enumerate
+       all non-isomorphic such multigraphs and compute the set of
+       achievable ranks via ``DEGREE_RANK_MAP``.
+    2. **Rank strings → boundary strings.**  For each rank, construct all
+       canonical rank strings via ``patterns_for_rank``, then integrate
+       with both initial values (``c=0`` and ``c=1``) to recover boundary
+       strings.  Both are needed because integration is ambiguous up to
+       an additive constant.
+    3. **Boundary strings → orientation strings.**  Integrate each
+       boundary string once more.  Only ``c=0`` is needed: complementing
+       an orientation string ``s`` (swapping 0 ↔ 1) leaves the boundary
+       string ``f`` unchanged—since ``(s_i + s_{i+1})`` and
+       ``(s̄_i + s̄_{i+1})`` have the same parity—so ``s`` and ``s̄``
+       encode the same cusp cellulation.
+
+    Args:
+        n: Number of fingers (must be divisible by 6).
+
+    Yields:
+        Orientation strings as tuples of 0/1 values.
+    """
     nv_oct = n // 6
     for rank in get_rank_spectrum(get_nonisomorphic_multigraphs(nv_oct, nv_oct)):
-        patterns = patterns_for_rank(n, rank)
-        boundary_finger_patterns = set(
-            [integrate(p, 0) for p in patterns] + [integrate(p, 1) for p in patterns]
-        )  # need to consider both halfs of the integral here
-        orientation_finger_patterns = [
-            integrate(p, 0) for p in boundary_finger_patterns
-        ]  # only need one half since orientation_finger_patterns have complement symmetry
-        for p in orientation_finger_patterns:
-            yield tuple(p)
+        rank_strings = patterns_for_rank(n, rank)
+        # Integrate rank strings → boundary strings.  Both initial values
+        # are needed because integration is ambiguous up to a constant.
+        boundary_strings = set(
+            [integrate(p, 0) for p in rank_strings]
+            + [integrate(p, 1) for p in rank_strings]
+        )
+        # Integrate boundary strings → orientation strings.  Only c=0 is
+        # needed: complementing s leaves f unchanged (complement symmetry).
+        orientation_strings = [integrate(f, 0) for f in boundary_strings]
+        for s in orientation_strings:
+            yield tuple(s)
 
 
 def generate_balanced_patterns(n: int) -> list[BinarySeq]:
@@ -351,9 +403,18 @@ def get_nonisomorphic_multigraphs(v: int, e: int) -> list[AdjMatrix]:
     return unique_graphs
 
 
-# Maps vertex degree to the tuple of possible rank contributions for that
-# degree.  Used by ``get_rank_spectrum`` to enumerate all feasible rank
-# sums over a multigraph's vertices.
+# Maps vertex degree in the oct-oct face-pairing multigraph to the tuple
+# of achievable rank contributions for that octahedron.  The rank
+# contribution is the OTTT count from the octahedron's type vector (the
+# ``a`` component of ``OctTypeVector``).  Which type vectors are
+# achievable depends on the vertex degree (number of oct-oct face
+# pairings); the remaining faces pair with tetrahedra.
+#
+# Used by ``get_rank_spectrum`` to enumerate all feasible total ranks
+# across the multigraph's vertices.
+#
+# TODO: derivation of this mapping from OCT_TYPE_VECTORS and
+# face-pairing constraints is not yet published in the thesis.
 DEGREE_RANK_MAP: dict[int, tuple[int, ...]] = {
     0: (0,),
     1: (3,),
@@ -364,18 +425,23 @@ DEGREE_RANK_MAP: dict[int, tuple[int, ...]] = {
 
 
 def get_rank_spectrum(graphs: list[AdjMatrix]) -> list[int]:
-    """Compute all achievable rank sums across a collection of multigraphs.
+    """Compute all achievable ranks across a collection of face-pairing multigraphs.
 
-    For each graph, maps every vertex degree through ``DEGREE_RANK_MAP`` to
-    get the set of possible rank contributions, then takes the Cartesian
-    product over vertices and sums each combination.  Returns the union of
-    all such sums across all graphs.
+    The *rank* of a boundary string is the Hamming weight of its derivative
+    (see module docstring).  Each octahedron contributes a rank component
+    determined by its degree in the face-pairing graph (via
+    ``DEGREE_RANK_MAP``).  The total rank is the sum over all octahedra.
+
+    For each graph, maps every vertex degree through ``DEGREE_RANK_MAP``,
+    takes the Cartesian product over vertices, and sums each combination.
+    Returns the union of all such sums across all graphs.
 
     Args:
-        graphs: A list of adjacency matrices.
+        graphs: A list of adjacency matrices (one per isomorphism class of
+            oct-oct face-pairing multigraph).
 
     Returns:
-        List of all distinct achievable rank sums.
+        List of all distinct achievable ranks.
     """
     all_sums: set[int] = set()
     for graph in graphs:
