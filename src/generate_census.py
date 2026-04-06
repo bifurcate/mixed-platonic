@@ -23,6 +23,9 @@ Usage:
 import argparse
 import json
 import logging
+import math
+import zlib
+from collections import Counter
 
 from bracelets import (
     generate_2_bracelets,
@@ -33,6 +36,58 @@ from finger_cusp import (
     to_multi_finger_pattern_str,
 )
 from long_cusp import build_cusp_sequences
+
+
+def compression_complexity(pattern: str) -> int:
+    """Approximate Kolmogorov complexity via zlib compressed length.
+
+    Args:
+        pattern: Pattern string.
+
+    Returns:
+        Length of the compressed representation in bytes.
+    """
+    return len(zlib.compress(pattern.encode()))
+
+
+def shannon_entropy(pattern: str) -> float:
+    """Compute Shannon entropy of the character distribution.
+
+    Args:
+        pattern: Pattern string.
+
+    Returns:
+        Entropy in bits.
+    """
+    n = len(pattern)
+    if n == 0:
+        return 0.0
+    counts = Counter(pattern)
+    return -sum((c / n) * math.log2(c / n) for c in counts.values())
+
+
+SORT_KEYS = {
+    "none": None,
+    "compression": compression_complexity,
+    "entropy": shannon_entropy,
+}
+
+
+def sort_patterns(patterns: list[str], method: str, reverse: bool) -> list[str]:
+    """Sort pattern strings by a complexity measure.
+
+    Args:
+        patterns: List of pattern strings.
+        method: One of "none", "compression", "entropy".
+        reverse: If True, sort most-complex first.
+
+    Returns:
+        Sorted (or original) list of pattern strings.
+    """
+    key_fn = SORT_KEYS[method]
+    if key_fn is None:
+        return patterns
+    return sorted(patterns, key=key_fn, reverse=reverse)
 
 
 def generate_finger_manifest(num_fingers: int) -> dict:
@@ -103,6 +158,21 @@ def main():
         "-l", "--long-cusp", type=int, help="Maximum length of long cusp pattern"
     )
 
+    parser.add_argument(
+        "-s",
+        "--sort",
+        choices=["none", "compression", "entropy"],
+        default="none",
+        help="Sort patterns by complexity (default: none)",
+    )
+
+    parser.add_argument(
+        "-r",
+        "--reverse",
+        action="store_true",
+        help="Sort most-complex first (default: least-complex first)",
+    )
+
     parser.add_argument("output", type=str, help="Path to write the manifest JSON file")
 
     args = parser.parse_args()
@@ -116,11 +186,16 @@ def main():
     else:
         parser.error("One of -n, -m, or -l is required")
 
+    manifest["patterns"] = sort_patterns(
+        manifest["patterns"], args.sort, args.reverse
+    )
+
     with open(args.output, "w") as f:
         json.dump(manifest, f, indent=2)
 
     logging.info(
-        f"Wrote manifest: {len(manifest['patterns'])} {manifest['type']} patterns -> {args.output}"
+        f"Wrote manifest: {len(manifest['patterns'])} {manifest['type']} patterns "
+        f"(sort={args.sort}, reverse={args.reverse}) -> {args.output}"
     )
 
 
