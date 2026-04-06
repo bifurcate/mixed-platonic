@@ -1,13 +1,12 @@
 """Generate a census manifest of cusp patterns.
 
-Enumerates all distinct cusp patterns of a given size (using bracelet
-enumeration to avoid duplicates under rotation and reflection) and writes
-a JSON manifest listing the pattern type and all patterns.  The manifest
-is consumed by ``construct_census.py`` to build solver environments.
+Enumerates all distinct cusp patterns of a given size and writes a JSON
+manifest listing the pattern type and all patterns.  The manifest is
+consumed by ``construct_census.py`` to build solver environments.
 
 Supports three pattern types:
-    - Finger patterns: ``-n <num_fingers>`` enumerates 2-bracelets of
-      the given length.
+    - Finger patterns: ``-n <num_fingers>`` enumerates patterns using
+      octahedron signature constraints.
     - Multi-component finger patterns: ``-m <num_fingers>`` enumerates
       multi-component 2-bracelets with the given number of fingers per
       component.
@@ -28,7 +27,6 @@ import zlib
 from collections import Counter
 
 from bracelets import (
-    generate_2_bracelets,
     generate_multi_2_bracelets,
 )
 from finger_cusp import (
@@ -36,6 +34,7 @@ from finger_cusp import (
     to_multi_finger_pattern_str,
 )
 from long_cusp import build_cusp_sequences
+from pattern_restriction import generate_short_cusp
 
 
 def compression_complexity(pattern: str) -> int:
@@ -91,7 +90,7 @@ def sort_patterns(patterns: list[str], method: str, reverse: bool) -> list[str]:
 
 
 def generate_finger_manifest(num_fingers: int) -> dict:
-    """Enumerate finger patterns and build a manifest dict.
+    """Enumerate finger patterns via octahedron constraints and build a manifest.
 
     Args:
         num_fingers: Length of finger patterns to enumerate.
@@ -99,7 +98,7 @@ def generate_finger_manifest(num_fingers: int) -> dict:
     Returns:
         Manifest dict with ``type`` and ``patterns`` keys.
     """
-    patterns = [to_finger_pattern_str(fp) for fp in generate_2_bracelets(num_fingers)]
+    patterns = [to_finger_pattern_str(fp) for fp in generate_short_cusp(num_fingers)]
     return {"type": "finger", "patterns": patterns}
 
 

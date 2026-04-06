@@ -19,7 +19,7 @@ from itertools import combinations
 BinaryLoop = tuple[int, ...]
 
 
-def integrate(loop: list[int], c: int) -> list[int]:
+def integrate(loop: list[int], c: int) -> tuple[int]:
     """Compute a discrete antiderivative of a cyclic binary loop (mod 2).
 
     Starting from initial value *c*, accumulates ``(loop[i] + running) % 2``
@@ -47,7 +47,7 @@ def integrate(loop: list[int], c: int) -> list[int]:
     if val != c:
         raise ValueError("Unorientable String")
 
-    return result
+    return tuple(result)
 
 
 def differentiate(loop: list[int] | tuple[int, ...]) -> tuple[int, ...]:

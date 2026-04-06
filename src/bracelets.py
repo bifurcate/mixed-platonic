@@ -2,14 +2,18 @@
 
 A *necklace* is an equivalence class of sequences under cyclic rotation.
 A *bracelet* is an equivalence class under both rotation and reflection.
-In this module, sequences additionally identify under complement (0 ↔ 1),
-so the full equivalence class of a sequence includes all rotations and
-reflections of both the sequence and its bitwise complement.
+Optionally, sequences can additionally identify under complement (0 ↔ 1),
+so the full equivalence class includes all rotations and reflections of
+both the sequence and its bitwise complement.
+
+The ``with_complement`` flag on ``is_canonical``, ``to_canonical``,
+``reduce_to_bracelets``, and ``generate_2_bracelets`` controls whether
+complement symmetry is included (default: False).
 
 The primary use case is enumerating distinct finger patterns for cusp
 cellulations: each finger pattern is a cyclic 0/1 sequence, and two
-patterns are equivalent if one can be obtained from the other by rotation,
-reflection, or global complement.
+patterns are equivalent if one can be obtained from the other by rotation
+and reflection (and optionally global complement).
 
 Public API:
     - ``generate_2_bracelets(n)`` — all bracelets of length *n* over {0, 1}
@@ -99,44 +103,65 @@ def balanced_sequences(n: int) -> list[BinarySeq]:
     return result
 
 
-def is_canonical(seq: BinarySeq) -> bool:
+def _candidates(seq: BinarySeq, with_complement: bool) -> list[BinarySeq]:
+    """Return all equivalent forms of *seq* under the chosen symmetry group.
+
+    Args:
+        seq: A 0/1 binary sequence.
+        with_complement: If True, include complement variants.
+
+    Returns:
+        List of equivalent sequences.
+    """
+    candidates = all_reflections(seq)
+    if with_complement:
+        candidates += all_reflections(complement(seq))
+    return candidates
+
+
+def is_canonical(seq: BinarySeq, with_complement: bool = False) -> bool:
     """Return True if *seq* is the canonical (lexicographically largest) representative.
 
-    The canonical representative is the lexicographic maximum over the full
-    bracelet equivalence class (rotations, reflections, and complement).
+    Args:
+        seq: A 0/1 binary sequence.
+        with_complement: If True, the equivalence class includes complement.
     """
-    candidates = equivalence_class(seq)
-    return seq == max(candidates)
+    return seq == max(_candidates(seq, with_complement))
 
 
-def to_canonical(seq: BinarySeq) -> BinarySeq:
+def to_canonical(seq: BinarySeq, with_complement: bool = False) -> BinarySeq:
     """Return the canonical (lexicographically largest) representative of *seq*'s bracelet class.
 
     Args:
         seq: Any 0/1 binary sequence.
+        with_complement: If True, the equivalence class includes complement.
 
     Returns:
         The lexicographically largest sequence in the equivalence class.
     """
-    candidates = equivalence_class(seq)
-    return max(candidates)
+    return max(_candidates(seq, with_complement))
 
 
-def reduce_to_bracelets(X: Iterator[BinarySeq]) -> Iterator[BinarySeq]:
+def reduce_to_bracelets(
+    X: Iterator[BinarySeq], with_complement: bool = False
+) -> Iterator[BinarySeq]:
     """Filter an iterable of sequences, yielding only canonical representatives.
 
     Args:
         X: Iterable of 0/1 binary sequences.
+        with_complement: If True, the equivalence class includes complement.
 
     Yields:
         Those elements of *X* that are canonical in their bracelet class.
     """
     for x in X:
-        if is_canonical(x):
+        if is_canonical(x, with_complement):
             yield x
 
 
-def generate_2_bracelets(n: int) -> Iterator[BinarySeq]:
+def generate_2_bracelets(
+    n: int, with_complement: bool = False
+) -> Iterator[BinarySeq]:
     """Yield all distinct bracelets of length *n* over {0, 1}.
 
     Enumerates all 2^n binary sequences and yields only the canonical
@@ -144,12 +169,13 @@ def generate_2_bracelets(n: int) -> Iterator[BinarySeq]:
 
     Args:
         n: Sequence length.
+        with_complement: If True, the equivalence class includes complement.
 
     Yields:
         Canonical 0/1 tuples, one per distinct bracelet.
     """
     for seq in product([1, 0], repeat=n):
-        if is_canonical(seq):
+        if is_canonical(seq, with_complement):
             yield seq
 
 
@@ -197,7 +223,11 @@ def generate_multi_2_bracelets_from_partition(
     factors = []
     for x in uniq_elements:
         count = partition.count(x)
-        factors.append(combinations_with_replacement(generate_2_bracelets(x), count))
+        factors.append(
+            combinations_with_replacement(
+                generate_2_bracelets(x, with_complement=True), count
+            )
+        )
 
     return (flatten_once(T) for T in product(*factors))
 

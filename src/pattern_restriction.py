@@ -1,24 +1,15 @@
-"""Restrict cusp pattern enumeration using octahedron signature constraints.
+"""Restrict cusp pattern enumeration using octahedron structural constraints.
 
 This module provides tools to prune the space of finger patterns by
 exploiting structural constraints from octahedron decompositions.  The
 key idea: each octahedron contributes a characteristic "type vector"
 ``(a, b, c)`` counting how its six square cusp cells distribute across
-three edge-pairing categories.  Summing these vectors over all octahedra
-yields an *octahedron signature* for the cusp, which constrains which
-finger patterns are geometrically realizable.
+three edge-pairing categories.
 
-The pipeline has three stages:
-
-1. **Signature enumeration** — ``valid_oct_signatures`` computes all
-   achievable octahedron signatures for *n* octahedra by summing
-   combinations of ``OCT_TYPE_VECTORS`` and filtering by validity.
-2. **Pattern construction** — ``finger_patterns_from_oct_signature``
-   builds candidate finger pattern strings from integer partitions that
-   distribute the signature components across groups.
-3. **Canonicalization and filtering** — ``generate_finger_patterns``
-   applies a derivative test and bracelet canonicality to yield only
-   distinct, valid patterns.
+The primary entry point is ``generate_short_cusp(n)``, which enumerates
+all valid finger patterns of length *n* by computing the achievable rank
+spectrum from non-isomorphic octahedral face-pairing multigraphs, then
+constructing patterns for each rank via integer partitions.
 
 Additionally, ``generate_balanced_patterns`` provides a simpler
 combinatorial approach using balanced binary tuples reduced to bracelets.
@@ -32,9 +23,8 @@ import itertools
 from collections.abc import Iterator
 from itertools import permutations
 
-from finger_cusp import to_finger_pattern_list, to_finger_pattern_str
-from bracelets import BinarySeq, is_canonical, to_canonical, reduce_to_bracelets
-from binary_loop import binary_tuples_of_weight
+from bracelets import BinarySeq, to_canonical, reduce_to_bracelets
+from binary_loop import binary_tuples_of_weight, integrate
 
 # Each octahedron has 6 square cusp cells.  A type vector ``(a, b, c)``
 # records how those 6 squares distribute across three edge-pairing
@@ -49,62 +39,6 @@ OCT_TYPE_VECTORS: list[OctTypeVector] = [
     (0, 0, 6),
     (6, 0, 0),
 ]
-
-# An octahedron signature ``(a, b, c)`` is the sum of type vectors over
-# all octahedra in the decomposition.  Valid signatures satisfy:
-# a > 0, a even, and b == c.
-OctSignature = tuple[int, int, int]
-
-
-def is_valid_oct_signature(a: int, b: int, c: int) -> bool:
-    """Check whether ``(a, b, c)`` is a valid octahedron signature.
-
-    A signature is valid when *a* is positive and even, and *b* equals *c*.
-
-    Args:
-        a: Count of squares in the first edge-pairing category.
-        b: Count in the second category.
-        c: Count in the third category.
-
-    Returns:
-        True if the signature is valid.
-    """
-    if a == 0 or a % 2 != 0 or b != c:
-        return False
-    return True
-
-
-def valid_oct_signatures(n: int) -> list[OctSignature]:
-    """Enumerate all distinct valid octahedron signatures for *n* octahedra.
-
-    Forms all combinations-with-replacement of *n* type vectors from
-    ``OCT_TYPE_VECTORS``, sums each combination component-wise, and
-    keeps only those sums that pass ``is_valid_oct_signature``.
-
-    Args:
-        n: Number of octahedra.
-
-    Returns:
-        De-duplicated list of valid ``(a, b, c)`` signature tuples.
-    """
-    combos = itertools.combinations_with_replacement(OCT_TYPE_VECTORS, n)
-    filtered: list[OctSignature] = []
-    for combo in combos:
-        csum: OctSignature = (0, 0, 0)
-        for vec in combo:
-            csum = (
-                csum[0] + vec[0],
-                csum[1] + vec[1],
-                csum[2] + vec[2],
-            )
-        if is_valid_oct_signature(csum[0], csum[1], csum[2]):
-            filtered.append(csum)
-
-    unique: list[OctSignature] = []
-    for x in filtered:
-        if x not in unique:
-            unique.append(x)
-    return unique
 
 
 def _get_partitions_of_length(n: int, length: int) -> list[tuple[int, ...]]:
@@ -168,130 +102,6 @@ def get_partitions(n: int, length: int) -> list[tuple[int, ...]]:
             all_partitions.append(padded)
 
     return all_partitions
-
-
-def toggle_sign(c: str) -> str | None:
-    """Flip a sign character: ``"+"`` ↔ ``"-"``.
-
-    Args:
-        c: A single-character sign string.
-
-    Returns:
-        The opposite sign, or None if *c* is neither ``"+"`` nor ``"-"``.
-    """
-    if c == "+":
-        return "-"
-    if c == "-":
-        return "+"
-    return None
-
-
-def finger_pattern_from_partitions(
-    num_groups: int, in_p: tuple[int, ...], out_p: tuple[int, ...]
-) -> str:
-    """Build a finger pattern string from in/out partition specifications.
-
-    Constructs a cyclic ``+``/``-`` string by iterating over *num_groups*
-    groups.  Within each group, the current sign is repeated according to
-    the in-partition, then the sign alternates according to the
-    out-partition.
-
-    Args:
-        num_groups: Number of groups (equal to ``a // 2`` from the signature).
-        in_p: In-partition tuple (one entry per group).
-        out_p: Out-partition tuple (one entry per group).
-
-    Returns:
-        A finger pattern string of ``+`` and ``-`` characters.
-    """
-    s = ""
-    c = "+"
-    for i in range(num_groups):
-        s += c
-        for j in range(in_p[i]):
-            s += c
-        s += c
-
-        for j in range(out_p[i]):
-            c = toggle_sign(c)
-            s += c
-
-        c = toggle_sign(c)
-    return s
-
-
-def finger_patterns_from_oct_signature(a: int, b: int, c: int) -> list[str]:
-    """Generate all finger pattern strings compatible with an octahedron signature.
-
-    Distributes the *b* and *c* counts across ``a // 2`` groups via integer
-    partitions, then builds a finger pattern for each (in, out) partition pair.
-
-    Args:
-        a: First signature component (must be positive and even).
-        b: Second signature component.
-        c: Third signature component (must equal *b*).
-
-    Returns:
-        List of finger pattern strings.
-    """
-    paren_pairs = a // 2
-
-    in_partitions = get_partitions(c, paren_pairs)
-    out_partitions = get_partitions(b, paren_pairs)
-
-    total_product = itertools.product(in_partitions, out_partitions)
-
-    finger_patterns: list[str] = []
-    for in_p, out_p in total_product:
-        fp = finger_pattern_from_partitions(paren_pairs, in_p, out_p)
-        finger_patterns.append(fp)
-
-    return finger_patterns
-
-
-def derivative_finger_pattern(s: str) -> str:
-    """Compute the discrete derivative of a finger pattern string.
-
-    At each position, outputs ``"+"`` if the character and its cyclic
-    successor are the same sign, or ``"-"`` if they differ.
-
-    Args:
-        s: A finger pattern string of ``+``/``-`` characters.
-
-    Returns:
-        The derivative string of the same length.
-    """
-    r = ""
-    for i in range(len(s)):
-        if s[i] == s[(i + 1) % len(s)]:
-            r += "+"
-        else:
-            r += "-"
-    return r
-
-
-def generate_finger_patterns(n: int) -> Iterator[tuple[OctSignature, str]]:
-    """Yield all valid canonical finger patterns for *n* octahedra.
-
-    For each valid octahedron signature, constructs candidate finger patterns
-    and filters them by two criteria:
-
-    1. The derivative must have exactly ``3n`` ``"+"`` characters (ensuring
-       the correct number of same-sign adjacent pairs).
-    2. The pattern must be the canonical representative of its bracelet class.
-
-    Args:
-        n: Number of octahedra.
-
-    Yields:
-        ``(signature, pattern_string)`` pairs.
-    """
-    for vec in valid_oct_signatures(n):
-        fps = finger_patterns_from_oct_signature(vec[0], vec[1], vec[2])
-        for fp in fps:
-            fpl = tuple(to_finger_pattern_list(fp))
-            if derivative_finger_pattern(fp).count("+") == 3 * n and is_canonical(fpl):
-                yield (vec, to_finger_pattern_str(fpl))
 
 
 def pattern_from_parts(
@@ -367,21 +177,18 @@ def patterns_for_rank(n: int, r: int) -> set[BinarySeq]:
     return patterns
 
 
-def generate_patterns(n: int) -> Iterator[tuple[int, ...]]:
-    """Yield all binary patterns of length *n* consistent with octahedron signatures.
-
-    For each valid signature of ``n // 6`` octahedra, generates patterns
-    matching the signature's rank.
-
-    Args:
-        n: Total pattern length (must be divisible by 6).
-
-    Yields:
-        Binary pattern tuples.
-    """
-    for vec in valid_oct_signatures(n // 6):
-        patterns = patterns_for_rank(n, vec[0])
-        for p in patterns:
+def generate_short_cusp(n: int) -> Iterator[tuple[int, ...]]:
+    """Yield all finger patterns of length *n* using octahedral face pairing graph and pattern_rank"""
+    nv_oct = n // 6
+    for rank in get_rank_spectrum(get_nonisomorphic_multigraphs(nv_oct, nv_oct)):
+        patterns = patterns_for_rank(n, rank)
+        boundary_finger_patterns = set(
+            [integrate(p, 0) for p in patterns] + [integrate(p, 1) for p in patterns]
+        )  # need to consider both halfs of the integral here
+        orientation_finger_patterns = [
+            integrate(p, 0) for p in boundary_finger_patterns
+        ]  # only need one half since orientation_finger_patterns have complement symmetry
+        for p in orientation_finger_patterns:
             yield tuple(p)
 
 
