@@ -296,6 +296,9 @@ class Solver:
         self.completed: list[list[tuple]] = []
         self.stack: list[StackFrame] = []
         self._stop_requested: bool = False
+        self.violation_counts: dict[str, int] = {}
+        self.max_embeddings: int = 0
+        self.max_embeddings_state: list[tuple] | None = None
 
     def request_stop(self) -> None:
         """Signal the solver to stop at the next safe point.
@@ -317,6 +320,9 @@ class Solver:
             "stack": [frame.dump() for frame in self.stack],
             "counter": self.counter,
             "completed": self.completed,
+            "violation_counts": self.violation_counts,
+            "max_embeddings": self.max_embeddings,
+            "max_embeddings_state": self.max_embeddings_state,
         }
 
     def load_checkpoint(self, data: dict) -> None:
@@ -332,6 +338,9 @@ class Solver:
         """
         self.counter = data["counter"]
         self.completed = data["completed"]
+        self.violation_counts = data.get("violation_counts", {})
+        self.max_embeddings = data.get("max_embeddings", 0)
+        self.max_embeddings_state = data.get("max_embeddings_state", None)
         self.stack = []
         self._stop_requested = False
 
@@ -397,23 +406,22 @@ class Solver:
             )
             return (init, next_embedding)
 
-    def get_next_induced(self) -> tuple[bool, int, Embedding | None]:
+    def get_next_induced(self) -> tuple[bool, int, Embedding | None, str | None]:
         """Scans all cusp cells for the next inducible or conflicting embedding.
 
         Iterates through the entire traversal looking for a cusp cell where
         neighbor constraints determine (or conflict with) an embedding.
 
         Returns:
-            A ``(ok, index, embedding)`` triple:
+            A ``(ok, index, embedding, violation)`` 4-tuple:
 
-            - ``(True, i, embedding)``: cell at index ``i`` has a valid
+            - ``(True, i, embedding, None)``: cell at index ``i`` has a valid
               induced embedding that should be added.
-            - ``(True, i, None)``: all cells are consistent and no further
+            - ``(True, i, None, None)``: all cells are consistent and no further
               inductions are possible (fixpoint reached).
-            - ``(False, i, _)``: a contradiction was found at index ``i``.
-              Either a constraint violation, a vertex double-embedding
-              conflict, or an inconsistency with an existing embedding.
-              The search should backtrack.
+            - ``(False, i, _, violation)``: a contradiction was found at index
+              ``i``. ``violation`` names the kind of conflict. The search
+              should backtrack.
         """
         for i, c in enumerate(self.traversal):
             existing_embedding = (
@@ -424,7 +432,7 @@ class Solver:
                 self.construction.get_induced_embedding_for_cell(c)
             )
             if violation:
-                return (False, i, None)
+                return (False, i, None, violation)
 
             if proposed_embedding is None:
                 continue
@@ -434,15 +442,15 @@ class Solver:
                 vert_idx = proposed_embedding.embedding_spec[0]
                 if self.construction.embeddings.is_vert_embedded(m_cell, vert_idx):
                     # Vert already embedded!
-                    return (False, i, proposed_embedding)
+                    return (False, i, proposed_embedding, "vert already embedded")
                 else:
-                    return (True, i, proposed_embedding)
+                    return (True, i, proposed_embedding, None)
 
             else:
                 if existing_embedding != proposed_embedding:
                     # Embedding inconsistency!
-                    return (False, i, proposed_embedding)
-        return (True, i, None)
+                    return (False, i, proposed_embedding, "embedding inconsistency")
+        return (True, i, None, None)
 
     def get_least_available_cusp_cell_idx(self) -> int | None:
         """Returns the traversal index of the first unembedded cusp cell, or None."""
@@ -541,9 +549,12 @@ class Solver:
             frame.induced_embeddings = []
             ok = True
             while True:
-                ok_inner, _, next_induced = self.get_next_induced()
+                ok_inner, _, next_induced, violation = self.get_next_induced()
                 if not ok_inner:
                     ok = False
+                    self.violation_counts[violation] = (
+                        self.violation_counts.get(violation, 0) + 1
+                    )
                     break
                 if next_induced is None:
                     break
@@ -552,6 +563,12 @@ class Solver:
 
             if not ok:
                 continue  # Contradiction — will backtrack on next iteration
+
+            # Track high-water mark for embeddings
+            current_size = len(self.construction.embeddings.Y)
+            if current_size > self.max_embeddings:
+                self.max_embeddings = current_size
+                self.max_embeddings_state = self.construction.embeddings.dump()
 
             # Step 5: Check if all cusp cells are now embedded
             next_tr_idx = self.get_least_available_cusp_cell_idx()

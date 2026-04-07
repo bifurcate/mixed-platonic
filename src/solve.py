@@ -198,8 +198,15 @@ def solve(env_path):
                 "runtime": end_time - start_time,
                 "iterations": solver.counter,
                 "num_completed": len(solver.completed),
+                "violation_counts": solver.violation_counts,
+                "max_embeddings": solver.max_embeddings,
             },
         )
+
+        if solver.max_embeddings_state is not None:
+            max_emb_path = env_path / "max_embeddings_state.json"
+            with open(max_emb_path, "w", encoding="utf-8") as f:
+                json.dump(solver.max_embeddings_state, f)
 
         write_state(env_path, "done")
         remove_checkpoint(env_path)
