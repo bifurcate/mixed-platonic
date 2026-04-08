@@ -12,18 +12,20 @@ opposite value.
 
 Terminology note
 ----------------
-The thesis defines three levels of binary string (see
+The thesis (§5.2) defines three levels of binary string (see
 ``pattern_restriction`` for the full hierarchy):
 
 - **Orientation string** ``s``: each entry is the orientation (0 or 1) of
   a finger.  This is what the code calls the "finger pattern" and what
   ``FingerCuspConstructor`` consumes to build the cusp tiling.
-- **Boundary string** ``f`` (called "finger pattern" in the thesis):
-  ``f = differentiate(s)``, encoding stay/switch at each finger boundary.
-- **Rank string**: ``differentiate(f)``.
+- **Finger pattern** ``f`` (thesis Definition 5.5):
+  ``f = differentiate(s)``, encoding stay (0) / switch (1) at each
+  finger boundary.
+- **Boundary derivative** ``r`` (thesis Definition 5.10):
+  ``r = differentiate(f)``.  Its Hamming weight is the oct-signature.
 
 In code, "finger pattern" refers to the orientation string ``s``.  In the
-thesis, "finger pattern" refers to the boundary string ``f``.
+thesis, "finger pattern" refers to the boundary-type string ``f``.
 
 Finger pattern representations
 ------------------------------

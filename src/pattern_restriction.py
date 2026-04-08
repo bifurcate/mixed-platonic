@@ -1,22 +1,48 @@
 """Restrict cusp pattern enumeration using octahedron structural constraints.
 
-This module provides tools to prune the space of finger patterns by
-exploiting structural constraints from octahedron decompositions.  The
-key idea: each octahedron contributes a characteristic "type vector"
-``(a, b, c)`` counting how its six square cusp cells distribute across
-three edge-pairing categories.
+This module prunes the space of short-meridian cusp patterns by
+exploiting structural constraints from octahedron face-pairing graphs
+and admissible face labelings (thesis §5.2).
 
-The primary entry point is ``generate_short_cusp(n)``, which enumerates
-all valid finger patterns of length *n* by computing the achievable rank
-spectrum from non-isomorphic octahedral face-pairing multigraphs, then
-constructing patterns for each rank via integer partitions.
+Terminology and binary string hierarchy
+----------------------------------------
+The short-meridian cusp cellulation is encoded by three levels of cyclic
+binary string, each related by mod-2 discrete differentiation/integration
+(see ``binary_loop``):
+
+- **Orientation string** ``s``: each entry is the orientation (0 or 1)
+  of the corresponding finger.  Two orientation strings that are
+  bitwise complements produce the same cusp cellulation (thesis §5.2,
+  complement symmetry).
+- **Finger pattern** ``f`` (thesis Definition 5.5): the boundary-type
+  string ``f_i = (s_i + s_{i+1}) mod 2``, i.e. ``f = differentiate(s)``.
+  Entry 0 = stay (same-orientation neighbours), 1 = switch (opposite).
+  Equivalence classes of ``f`` under rotation and reversal are bracelets
+  (no complement symmetry needed, since complementing ``s`` leaves ``f``
+  unchanged).
+- **Boundary derivative** ``r`` (thesis Definition 5.10):
+  ``r = differentiate(f)``.  Entry ``r_i = 1`` iff the square tile of
+  finger ``i+1`` has type [OTTT] (thesis Proposition 5.11).  The
+  Hamming weight ``wt_1(r)`` is the *oct-signature* ``σ(f)`` — the
+  total number of [OTTT] square tiles.
+
+The primary entry point is ``generate_short_cusp(n)``, which implements
+the enumeration algorithm from the thesis (§5.2):
+
+1. Enumerate all non-isomorphic ``G_OO`` multigraphs (``n_oct`` vertices,
+   ``n_oct`` edges; thesis Lemma 5.6 and §5.2.1).
+2. For each graph, compute achievable oct-signatures from the degree
+   sequence via ``DEGREE_RANK_MAP`` (thesis Table 3, Corollary 5.12).
+3. For each oct-signature, construct boundary derivatives ``r`` with
+   ``wt_1(r) = σ``, then integrate twice to recover orientation strings.
+4. Canonicalize under rotation, reversal, and complement.
 
 Additionally, ``generate_balanced_patterns`` provides a simpler
 combinatorial approach using balanced binary tuples reduced to bracelets.
 
 The module also includes multigraph enumeration utilities
-(``get_nonisomorphic_multigraphs``, ``get_rank_spectrum``) used to
-compute achievable rank spectra from vertex-degree constraints.
+(``get_nonisomorphic_multigraphs``, ``get_oct_signature_spectrum``) for
+enumerating ``G_OO`` candidates and computing oct-signature spectra.
 """
 
 import itertools
@@ -26,18 +52,25 @@ from itertools import permutations
 from bracelets import BinarySeq, to_canonical, reduce_to_bracelets
 from binary_loop import binary_tuples_of_weight, integrate
 
-# Each octahedron has 6 square cusp cells.  A type vector ``(a, b, c)``
-# records how those 6 squares distribute across three edge-pairing
-# categories.  The entries always sum to 6.
+# Each octahedron has 6 square cusp cells (thesis Proposition 5.9).
+# A type vector ``(a, b, c)`` records how those 6 squares distribute
+# across three restricted square tile type categories (thesis
+# Proposition 5.5):
+#   a = [OTTT]  (one stay + one switch boundary)
+#   b = [TTTT]  (both boundaries same type: both stays or both switches)
+#   c = [OTOT]  (both boundaries same type, alternating edge types)
+# The entries always sum to 6.  The six admissible octahedron face
+# labelings A–F (thesis Proposition 5.9) each produce one of these
+# distributions.
 OctTypeVector = tuple[int, int, int]
 
 OCT_TYPE_VECTORS: list[OctTypeVector] = [
-    (3, 3, 0),
-    (3, 0, 3),
-    (4, 1, 1),
-    (0, 6, 0),
-    (0, 0, 6),
-    (6, 0, 0),
+    (3, 3, 0),  # Labeling B (degree 1): [OTTT]=3, [TTTT]=3, [OTOT]=0
+    (3, 0, 3),  # Labeling E (degree 3): [OTTT]=3, [TTTT]=0, [OTOT]=3
+    (4, 1, 1),  # Labeling C (degree 2): [OTTT]=4, [TTTT]=1, [OTOT]=1
+    (0, 6, 0),  # Labeling A (degree 0): [OTTT]=0, [TTTT]=6, [OTOT]=0
+    (0, 0, 6),  # Labeling F (degree 4): [OTTT]=0, [TTTT]=0, [OTOT]=6
+    (6, 0, 0),  # Labeling D (degree 2): [OTTT]=6, [TTTT]=0, [OTOT]=0
 ]
 
 
@@ -150,24 +183,29 @@ def pattern_from_parts(
     return P
 
 
-def patterns_for_rank(n: int, r: int) -> set[BinarySeq]:
-    """Enumerate all canonical binary patterns of length *n* with rank *r*.
+def patterns_for_oct_sig(n: int, sigma: int) -> set[BinarySeq]:
+    """Enumerate all canonical boundary derivatives of length *n* with oct-signature *sigma*.
 
-    Distributes ``(n - r) / 2`` zeros across ``r / 2`` odd and even slots
-    via integer partitions, then builds and canonicalizes all resulting
-    patterns.
+    The boundary derivative ``r`` (thesis Definition 5.10) has
+    ``wt_1(r) = sigma``, where ``sigma`` is the oct-signature — the
+    total number of [OTTT] square tiles.  This function constructs all
+    canonical binary sequences of length *n* with exactly *sigma* ones
+    by distributing ``(n - sigma) / 2`` zeros across ``sigma / 2`` odd
+    and even slots via integer partitions.
 
     Args:
-        n: Total pattern length.
-        r: Rank (must have same parity as *n*; ``r / 2`` must be integral).
+        n: Total pattern length (number of fingers).
+        sigma: Oct-signature — Hamming weight of the boundary derivative.
+            Must have the same parity as *n*; ``sigma / 2`` must be
+            integral.
 
     Returns:
         Set of canonical binary sequences.
     """
-    b = (n - r) // 2
+    b = (n - sigma) // 2
 
-    odd_parts = get_partitions(b, r // 2)
-    even_parts = get_partitions(b, r // 2)
+    odd_parts = get_partitions(b, sigma // 2)
+    even_parts = get_partitions(b, sigma // 2)
 
     total_product = itertools.product(odd_parts, even_parts)
     patterns: set[BinarySeq] = set()
@@ -178,18 +216,54 @@ def patterns_for_rank(n: int, r: int) -> set[BinarySeq]:
 
 
 def generate_short_cusp(n: int) -> Iterator[tuple[int, ...]]:
-    """Yield all finger patterns of length *n* using octahedral face pairing graph and pattern_rank"""
+    """Yield all canonical orientation strings of length *n* for short-meridian cusps.
+
+    Implements the enumeration algorithm from the thesis (§5.2):
+
+    1. **G_OO enumeration.**  The oct-oct face-pairing subgraph ``G_OO``
+       has ``v = e = n_oct`` (thesis Lemma 5.6).  Enumerate all
+       non-isomorphic loopless multigraphs with these parameters.
+    2. **Oct-signature spectrum.**  For each graph, compute achievable
+       oct-signatures from the degree sequence via ``DEGREE_RANK_MAP``
+       (thesis Table 3, Corollary 5.12).
+    3. **Boundary derivatives → finger patterns → orientation strings.**
+       For each oct-signature ``σ``, construct all boundary derivatives
+       ``r`` with ``wt_1(r) = σ`` via ``patterns_for_oct_sig``.
+       Integrate ``r`` with both initial values (``c=0`` and ``c=1``)
+       to recover finger patterns ``f`` (two solutions per ``r`` since
+       integration is ambiguous up to an additive constant).  Integrate
+       ``f`` once more (``c=0`` only) to get orientation strings ``s``.
+       Only one initial value is needed here: complementing ``s``
+       (swapping 0 ↔ 1) leaves ``f`` unchanged, so ``s`` and ``s̄``
+       encode the same cusp cellulation.
+    4. **Canonicalization.**  Each orientation string is reduced to its
+       canonical bracelet representative under rotation, reversal, and
+       complement (via ``to_canonical`` with ``with_complement=True``).
+
+    Args:
+        n: Number of fingers (must be divisible by 6).
+
+    Yields:
+        Canonical orientation strings as tuples of 0/1 values.
+    """
     nv_oct = n // 6
-    for rank in get_rank_spectrum(get_nonisomorphic_multigraphs(nv_oct, nv_oct)):
-        patterns = patterns_for_rank(n, rank)
-        boundary_finger_patterns = set(
-            [integrate(p, 0) for p in patterns] + [integrate(p, 1) for p in patterns]
-        )  # need to consider both halfs of the integral here
-        orientation_finger_patterns = set(
-            to_canonical(integrate(p, 0), True) for p in boundary_finger_patterns
-        )  # only need one half since orientation_finger_patterns have complement symmetry. but we need to canonicalize
-        for p in orientation_finger_patterns:
-            yield tuple(p)
+    for sigma in get_oct_signature_spectrum(get_nonisomorphic_multigraphs(nv_oct, nv_oct)):
+        boundary_derivatives = patterns_for_oct_sig(n, sigma)
+        # Integrate boundary derivatives → finger patterns.  Both initial
+        # values are needed (integration ambiguous up to a constant).
+        finger_patterns = set(
+            [integrate(r, 0) for r in boundary_derivatives]
+            + [integrate(r, 1) for r in boundary_derivatives]
+        )
+        # Integrate finger patterns → orientation strings.  Only c=0 is
+        # needed: complementing s leaves f unchanged (complement symmetry).
+        # Canonicalize under rotation, reversal, and complement.
+        orientation_strings = set(
+            to_canonical(integrate(f, 0), with_complement=True)
+            for f in finger_patterns
+        )
+        for s in orientation_strings:
+            yield tuple(s)
 
 
 def generate_balanced_patterns(n: int) -> list[BinarySeq]:
@@ -269,13 +343,18 @@ def get_vertex_degrees(adj_matrix: AdjMatrix) -> list[int]:
 def get_nonisomorphic_multigraphs(v: int, e: int) -> list[AdjMatrix]:
     """Generate all non-isomorphic loopless multigraphs on *v* vertices with *e* edges.
 
+    In the short-meridian enumeration, this produces candidate ``G_OO``
+    subgraphs of the face-pairing graph (thesis Definition 5.8, §5.2.1).
+    Each vertex represents an octahedron and each edge an oct-oct face
+    pairing; ``v = e = n_oct`` by thesis Lemma 5.6.
+
     Uses brute-force distribution of edge multiplicities across vertex pairs,
     with degree-sequence pruning and exhaustive permutation checking for
     isomorphism (practical for v <= 7).
 
     Args:
-        v: Number of vertices.
-        e: Total number of edges (counting multiplicity).
+        v: Number of vertices (octahedra).
+        e: Total number of edges (oct-oct face pairings).
 
     Returns:
         A list of adjacency matrices, one per isomorphism class.
@@ -351,31 +430,42 @@ def get_nonisomorphic_multigraphs(v: int, e: int) -> list[AdjMatrix]:
     return unique_graphs
 
 
-# Maps vertex degree to the tuple of possible rank contributions for that
-# degree.  Used by ``get_rank_spectrum`` to enumerate all feasible rank
-# sums over a multigraph's vertices.
+# Maps vertex degree in G_OO to the tuple of achievable oct-signature
+# contributions (= [OTTT] tile counts) for that octahedron.  Derived from
+# thesis Table 3 (tab:degree-oct-sig): each degree determines which
+# admissible face labelings are possible, and the [OTTT] count of each
+# labeling gives the contribution.  Degree 2 has two labelings (C and D)
+# with different contributions (4 and 6).
+#
+# See thesis Corollary 5.12 for how these per-vertex contributions combine
+# to give the set of achievable total oct-signatures.
 DEGREE_RANK_MAP: dict[int, tuple[int, ...]] = {
-    0: (0,),
-    1: (3,),
-    2: (4, 6),
-    3: (3,),
-    4: (0,),
+    0: (0,),   # Labeling A only
+    1: (3,),   # Labeling B only
+    2: (4, 6), # Labeling C (4) or D (6)
+    3: (3,),   # Labeling E only
+    4: (0,),   # Labeling F only
 }
 
 
-def get_rank_spectrum(graphs: list[AdjMatrix]) -> list[int]:
-    """Compute all achievable rank sums across a collection of multigraphs.
+def get_oct_signature_spectrum(graphs: list[AdjMatrix]) -> list[int]:
+    """Compute all achievable oct-signatures across a collection of G_OO multigraphs.
 
-    For each graph, maps every vertex degree through ``DEGREE_RANK_MAP`` to
-    get the set of possible rank contributions, then takes the Cartesian
-    product over vertices and sums each combination.  Returns the union of
-    all such sums across all graphs.
+    The oct-signature ``σ(f)`` is the total number of [OTTT] square tiles
+    (thesis Definition 5.10).  Each octahedron contributes an [OTTT] count
+    determined by its degree in ``G_OO`` (thesis Table 3).  The total
+    oct-signature is the sum over all octahedra (thesis Corollary 5.12).
+
+    For each graph, maps every vertex degree through ``DEGREE_RANK_MAP``,
+    takes the Cartesian product over vertices, and sums each combination.
+    Returns the union of all such sums across all graphs.
 
     Args:
-        graphs: A list of adjacency matrices.
+        graphs: A list of adjacency matrices (one per isomorphism class
+            of ``G_OO``).
 
     Returns:
-        List of all distinct achievable rank sums.
+        List of all distinct achievable oct-signatures.
     """
     all_sums: set[int] = set()
     for graph in graphs:
