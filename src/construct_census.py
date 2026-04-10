@@ -11,8 +11,10 @@ Usage:
 import argparse
 import json
 import logging
+import os
 import shutil
 from pathlib import Path
+from string import Template
 
 from construct import (
     generate,
@@ -36,6 +38,59 @@ def parse_multi_finger_pattern_str(s: str) -> list[list[int]]:
     """
     parts = s.strip("|").split("|")
     return [to_finger_pattern_list(p) for p in parts]
+
+
+SLURM_TEMPLATE = Template("""\
+#!/bin/bash
+#SBATCH --job-name=${census_name}
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=128
+#SBATCH --time=96:00:00
+#SBATCH --partition=msismall
+#SBATCH --output=run-log-%j.out
+
+${module_load}
+srun ${python_cmd} ${project_src_path}/src/solve_census.py ${path_to_census}
+""")
+
+
+def write_slurm_script(census_root: Path) -> None:
+    """Write a SLURM job script into the census directory.
+
+    Args:
+        census_root: Path to the census directory.
+
+    Raises:
+        RuntimeError: If MP_PROJECT_SRC_PATH is not set.
+    """
+    project_src_path = os.environ.get("MP_PROJECT_SRC_PATH")
+    if not project_src_path:
+        logging.warning(
+            "MP_PROJECT_SRC_PATH not set; skipping SLURM script generation"
+        )
+        return
+
+    python_cmd = os.environ.get("MP_PYTHON_CMD")
+    if python_cmd:
+        module_load = ""
+    else:
+        module_load = "module load python # load environment with Python 3"
+        python_cmd = "python"
+
+    census_path = census_root.resolve()
+
+    script = SLURM_TEMPLATE.substitute(
+        census_name=census_root.name,
+        module_load=module_load,
+        python_cmd=python_cmd,
+        project_src_path=project_src_path,
+        path_to_census=census_path,
+    )
+
+    script_path = census_root / "run.sh"
+    script_path.write_text(script)
+    script_path.chmod(0o755)
+    logging.info(f"Wrote SLURM script: {script_path}")
 
 
 def construct_from_manifest(census_root: Path, manifest: dict) -> None:
@@ -78,6 +133,7 @@ def construct_from_manifest(census_root: Path, manifest: dict) -> None:
             logging.error(f"Unknown pattern type: {pattern_type}")
             return
 
+    write_slurm_script(census_root)
     logging.info("Completed census construction")
 
 

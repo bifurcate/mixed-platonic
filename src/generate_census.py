@@ -33,7 +33,7 @@ from finger_cusp import (
     to_finger_pattern_str,
     to_multi_finger_pattern_str,
 )
-from long_cusp import build_cusp_sequences
+from long_cusp import generate_long_cusp
 from pattern_restriction import generate_short_cusp
 
 
@@ -127,7 +127,7 @@ def generate_long_cusp_manifest(max_length: int) -> dict:
     Returns:
         Manifest dict with ``type`` and ``patterns`` keys.
     """
-    patterns = list(build_cusp_sequences(max_length))
+    patterns = list(generate_long_cusp(max_length))
     return {"type": "long_cusp", "patterns": patterns}
 
 

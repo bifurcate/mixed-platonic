@@ -108,8 +108,13 @@ poetry run python src/generate_census.py -n 12 my_manifest.json
 #    (also copies the manifest into the census directory as manifest.json)
 poetry run python src/construct_census.py my_manifest.json my_census
 
-# 3. Solve all environments (run multiple workers in parallel)
+# 3. Solve all environments
+#    Locally (run multiple workers in parallel):
 poetry run python src/solve_census.py my_census
+
+#    Or via SLURM (construct_census generates a run.sh script):
+cd my_census
+sbatch run.sh
 
 # 4. Report census status and list environments with completions
 poetry run python src/analyze_census.py my_census

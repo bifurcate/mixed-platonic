@@ -9,7 +9,7 @@ subsequence at the junction.
 
 The generation pipeline has three stages:
 
-1. **Enumeration** — ``build_cusp_sequences`` uses the transition graph
+1. **Enumeration** — ``generate_long_cusp`` uses the transition graph
    ``SEQ_GEN_GRAPH`` to enumerate all valid cyclic label sequences of a
    given length, filtering by polygon-count divisibility and bracelet
    canonicity.
@@ -524,7 +524,7 @@ def next_seq_gen(gen: list[str]) -> list[str]:
     return next_gen
 
 
-def build_cusp_sequences(n: int) -> list[LongCuspPattern]:
+def generate_long_cusp(n: int) -> list[LongCuspPattern]:
     """Enumerate all valid long-cusp patterns up to length *n*.
 
     Grows sequences from single-character seeds using the transition graph,
