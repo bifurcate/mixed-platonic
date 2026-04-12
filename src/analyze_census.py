@@ -4,64 +4,69 @@ Reports aggregate statistics across all environments in a census
 directory: how many are in each lifecycle state (init, exec, done)
 and which completed environments produced valid cellulations.
 
+Reads from the combined ``data.json`` produced by ``gather_census.py``.
+
 Usage:
     poetry run python src/analyze_census.py my_census
 """
 
 import argparse
-import os
+import json
 from pathlib import Path
 
-from env import read_state, read_info
 
-
-def get_completed(census_path) -> dict:
-    """Find environments that finished with at least one completion.
+def load_census_data(census_path: Path) -> dict:
+    """Load the combined data.json from a census directory.
 
     Args:
         census_path: Path to the census root directory.
+
+    Returns:
+        Dict mapping environment names to their gathered data.
+    """
+    data_path = census_path / "data.json"
+    with open(data_path, "r") as f:
+        return json.load(f)
+
+
+def get_completed(census_data: dict) -> dict:
+    """Find environments that finished with at least one completion.
+
+    Args:
+        census_data: Combined census data from data.json.
 
     Returns:
         Dict mapping environment name to number of completions.
     """
-
     completed = {}
-    run_env_paths = (
-        census_path / entry.name for entry in os.scandir(census_path) if entry.is_dir()
-    )
-    for p in run_env_paths:
-        state = read_state(p)
+    for env_name, env_data in census_data.items():
+        state = env_data.get("state", {}).get("state")
         if state != "done":
             continue
-        info = read_info(p)
-        num_completed = info["num_completed"]
+        info = env_data.get("info", {})
+        num_completed = info.get("num_completed", 0)
         if num_completed <= 0:
             continue
-        completed[p.name] = num_completed
+        completed[env_name] = num_completed
     return completed
 
 
-def get_run_stats(census_path) -> dict:
+def get_run_stats(census_data: dict) -> dict:
     """Count environments in each lifecycle state.
 
     Args:
-        census_path: Path to the census root directory.
+        census_data: Combined census data from data.json.
 
     Returns:
         Dict with keys: init, exec, done, total.
     """
-
     num_init = 0
     num_exec = 0
     num_done = 0
     num_total = 0
 
-    run_env_paths = (
-        census_path / entry.name for entry in os.scandir(census_path) if entry.is_dir()
-    )
-
-    for p in run_env_paths:
-        state = read_state(p)
+    for env_data in census_data.values():
+        state = env_data.get("state", {}).get("state")
 
         if state == "init":
             num_init += 1
@@ -121,9 +126,11 @@ def main():
     census_name = args.name
     census_path = Path(census_name)
 
-    run_stats = get_run_stats(census_path)
+    census_data = load_census_data(census_path)
+
+    run_stats = get_run_stats(census_data)
     print_run_stats(run_stats)
-    completed = get_completed(census_path)
+    completed = get_completed(census_data)
     print_completed(completed)
 
 
