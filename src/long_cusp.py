@@ -390,13 +390,13 @@ CONNECT_LR_TEMPLATES: dict[str, ConnectTemplate] = {
     "aba": [
         (
             0,
-            (3, 4),
+            (4, 3),
             0,
             (1, 2),
         ),
         (
             3,
-            (3, 4),
+            (4, 3),
             3,
             (1, 2),
         ),
@@ -448,7 +448,7 @@ CONNECT_LR_TEMPLATES: dict[str, ConnectTemplate] = {
     "ccc": [
         (
             2,
-            (3, 4),
+            (4, 3),
             2,
             (1, 2),
         ),
