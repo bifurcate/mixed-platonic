@@ -115,6 +115,17 @@ def test_get_poly_count():
     assert count[1] == 7
 
 
+@pytest.mark.parametrize("pattern", _long_cusp_patterns)
+def test_divisibility(pattern):
+    """Constructed cusp cell counts satisfy 4|n_tri and 6|n_sqr."""
+    cusp = Cusp()
+    constructor = LongCuspConstructor(cusp, pattern)
+    constructor.generate()
+    n_tri, n_sqr = constructor.get_num_polys()
+    assert n_tri % 4 == 0, f"Pattern {pattern!r}: n_tri={n_tri} not divisible by 4"
+    assert n_sqr % 6 == 0, f"Pattern {pattern!r}: n_sqr={n_sqr} not divisible by 6"
+
+
 def test_next_seq_gen():
 
     gen = ["a", "b", "c", "d", "e"]

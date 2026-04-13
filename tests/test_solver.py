@@ -1,5 +1,6 @@
 import pytest
 
+from base import Sqr, Tri
 from construction import Cusp, Embeddings, Construction
 from finger_cusp import FingerCuspConstructor
 from solver import Solver, StackFrame
@@ -182,6 +183,61 @@ def test_stack_frame_dump_load():
     assert restored.induced_embeddings == frame.induced_embeddings
     assert restored.init == frame.init
     assert restored.placed is False
+
+
+def make_s913_solver():
+    """Build a Solver for the s913 example cusp."""
+    cusp = Cusp()
+
+    # Component 1
+    cusp.pair(Sqr(0), (2, 3), Sqr(1), (1, 4))
+    cusp.pair(Sqr(1), (2, 3), Tri(1), (1, 3))
+    cusp.pair(Tri(1), (1, 2), Tri(0), (1, 3))
+    cusp.pair(Tri(0), (2, 3), Sqr(0), (1, 4))
+    cusp.pair(Sqr(0), (3, 4), Sqr(2), (2, 1))
+    cusp.pair(Sqr(1), (3, 4), Sqr(3), (2, 1))
+    cusp.pair(Tri(1), (2, 3), Tri(2), (2, 1))
+    cusp.pair(Sqr(2), (2, 3), Sqr(3), (1, 4))
+    cusp.pair(Sqr(3), (2, 3), Tri(3), (1, 3))
+    cusp.pair(Tri(3), (1, 2), Tri(2), (1, 3))
+    cusp.pair(Tri(2), (2, 3), Sqr(2), (1, 4))
+    cusp.pair(Sqr(2), (3, 4), Tri(4), (2, 1))
+    cusp.pair(Sqr(3), (3, 4), Tri(6), (2, 1))
+    cusp.pair(Tri(3), (2, 3), Sqr(4), (2, 1))
+    cusp.pair(Tri(4), (2, 3), Tri(5), (2, 1))
+    cusp.pair(Tri(5), (2, 3), Tri(6), (1, 3))
+    cusp.pair(Tri(6), (2, 3), Tri(7), (2, 1))
+    cusp.pair(Tri(7), (2, 3), Sqr(4), (1, 4))
+    cusp.pair(Sqr(4), (2, 3), Tri(4), (1, 3))
+    cusp.pair(Tri(5), (1, 3), Sqr(0), (1, 2))
+    cusp.pair(Tri(7), (1, 3), Sqr(1), (1, 2))
+    cusp.pair(Sqr(4), (3, 4), Tri(0), (2, 1))
+
+    # Component 2
+    cusp.pair(Sqr(5), (2, 3), Sqr(5), (1, 4))
+    cusp.pair(Sqr(5), (3, 4), Sqr(5), (2, 1))
+
+    traversal = [
+        Sqr(5), Sqr(0), Sqr(1), Tri(1), Tri(0),
+        Sqr(2), Sqr(3), Tri(3), Tri(2),
+        Tri(4), Tri(5), Tri(6), Tri(7), Sqr(4),
+    ]
+
+    num_tets = 2
+    num_octs = 1
+    embeddings = Embeddings()
+    construction = Construction(cusp, embeddings)
+    return Solver(traversal, construction, num_tets, num_octs)
+
+
+def test_s913_solver_completes():
+    """The s913 example cusp produces completed embeddings."""
+    solver = make_s913_solver()
+    result = solver.run()
+
+    assert result == "completed"
+    assert solver.counter == 313
+    assert len(solver.completed) == 8
 
 
 def test_stack_frame_dump_load_none_embedding():
