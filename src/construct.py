@@ -20,6 +20,8 @@ from finger_cusp import (
     FingerPattern,
     MultiFingerCuspConstructor,
     parse_finger_pattern,
+    to_finger_pattern_str,
+    to_multi_finger_pattern_str,
 )
 from long_cusp import LongCuspConstructor
 from env import (
@@ -87,7 +89,15 @@ def generate_config_from_finger_pattern(env_path, finger_pattern):
     traversal = list(cusp_constructor.traversal())
     num_tets, num_octs = determine_num_tets_octs(finger_pattern)
 
-    write_config(env_path, num_tets, num_octs, cusp, traversal)
+    write_config(
+        env_path,
+        num_tets,
+        num_octs,
+        cusp,
+        traversal,
+        pattern=to_finger_pattern_str(finger_pattern),
+        pattern_type="finger",
+    )
 
 
 def generate_config_from_long_cusp_pattern(env_path, long_cusp_pattern):
@@ -119,7 +129,15 @@ def generate_config_from_long_cusp_pattern(env_path, long_cusp_pattern):
     num_tets = num_tris // 4
     num_octs = num_sqrs // 6
 
-    write_config(env_path, num_tets, num_octs, cusp, traversal)
+    write_config(
+        env_path,
+        num_tets,
+        num_octs,
+        cusp,
+        traversal,
+        pattern=long_cusp_pattern,
+        pattern_type="long_cusp",
+    )
     write_state(env_path, "init")
     logging.info(f"Generated search environment: {env_path.name}")
 
@@ -170,7 +188,15 @@ def generate_config_from_multi_finger_pattern(env_path, multi_finger_pattern):
     cusp_constructor.generate()
     traversal = list(cusp_constructor.traversal())
     num_tets, num_octs = determine_num_tets_octs(cusp_constructor.flattened)
-    write_config(env_path, num_tets, num_octs, cusp, traversal)
+    write_config(
+        env_path,
+        num_tets,
+        num_octs,
+        cusp,
+        traversal,
+        pattern=to_multi_finger_pattern_str(multi_finger_pattern),
+        pattern_type="multi_finger",
+    )
 
 
 def main():

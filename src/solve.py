@@ -53,6 +53,8 @@ def log_config(config):
     logging.info(f"name: {config['name']}")
     logging.info(f"num_tets: {config['num_tets']}")
     logging.info(f"num_octs: {config['num_octs']}")
+    logging.info(f"pattern_type: {config.get('pattern_type')}")
+    logging.info(f"pattern: {config.get('pattern')}")
     logging.info(f"cusp: {config['cusp']}")
     logging.info(f"traversal: {config['traversal']}")
 

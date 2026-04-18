@@ -30,6 +30,8 @@ from collections.abc import Iterator
 from base import CuspCell, Sqr, Tri, SQR, TRI
 
 from construction import Cusp
+from cusp_geometry import CuspGeometry
+from cyclotomic import CyclotomicInt
 
 # Strip label type: single-character string from the set {a, b, c, d, e}.
 StripLabel = str
@@ -91,6 +93,46 @@ STRIP_TEMPLATES: dict[StripLabel, StripTemplate] = {
                 (1, 4),
             ),
         ],
+        "geometry": (
+            {
+                "verts": (
+                    {
+                        1: (0, 0, 0, 0),
+                        2: (0, 0, 0, 1),
+                        3: (1, 0, 0, 1),
+                        4: (1, 0, 0, 0),
+                    },
+                    {1: (0, 0, 0, 1), 2: (0, 0, 1, 1), 3: (1, 0, 0, 1)},
+                    {1: (0, 0, 1, 1), 2: (-1, 0, 2, 1), 3: (0, 0, 2, 1)},
+                    {
+                        1: (-1, 0, 2, 1),
+                        2: (-1, 0, 2, 2),
+                        3: (0, 0, 2, 2),
+                        4: (0, 0, 2, 1),
+                    },
+                ),
+                "shift": (1, 0, 0, 0),
+            },
+            {
+                "verts": (
+                    {
+                        1: (-1, 0, 1, 0),
+                        2: (-1, 0, 1, 2),
+                        3: (0, 0, 1, 2),
+                        4: (0, 0, 1, 1),
+                    },
+                    {1: (-1, 0, 1, 2), 2: (-1, 0, 2, 2), 3: (0, 0, 1, 2)},
+                    {1: (0, 0, 0, 0), 2: (-1, 0, 1, 0), 3: (0, 0, 1, 0)},
+                    {
+                        1: (-1, 0, 1, 0),
+                        2: (-1, 0, 1, 1),
+                        3: (0, 0, 1, 1),
+                        4: (0, 0, 0, 1),
+                    },
+                ),
+                "shift": (0, 0, 0, 0),
+            },
+        ),
     },
     "b": {
         "polys": [
@@ -105,6 +147,22 @@ STRIP_TEMPLATES: dict[StripLabel, StripTemplate] = {
                 (1, 3),
             ),
         ],
+        "geometry": (
+            {
+                "verts": (
+                    {1: (0, 0, 0, 1), 2: (-1, 0, 1, 1), 3: (0, 0, 1, 1)},
+                    {1: (-1, 0, 1, 1), 2: (-1, 0, 2, 1), 3: (0, 0, 1, 1)},
+                ),
+                "shift": (0, 0, 0, 0),
+            },
+            {
+                "verts": (
+                    {1: (0, 0, 1, 2), 2: (-1, 0, 2, 2), 3: (0, 0, 2, 2)},
+                    {1: (0, 0, 0, 0), 2: (0, 0, 1, 0), 3: (1, 0, 0, 0)},
+                ),
+                "shift": (1, 0, 0, 0),
+            },
+        ),
     },
     "c": {
         "polys": [
@@ -126,6 +184,34 @@ STRIP_TEMPLATES: dict[StripLabel, StripTemplate] = {
                 (1, 3),
             ),
         ],
+        "geometry": (
+            {
+                "verts": (
+                    {1: (0, 0, 0, 0), 2: (0, 0, 1, 0), 3: (1, 0, 0, 0)},
+                    {1: (0, 0, 1, 1), 2: (-1, 0, 2, 1), 3: (0, 0, 2, 1)},
+                    {
+                        1: (-1, 0, 2, 1),
+                        2: (-1, 0, 2, 2),
+                        3: (0, 0, 2, 2),
+                        4: (0, 0, 2, 1),
+                    },
+                ),
+                "shift": (1, 0, 0, 0),
+            },
+            {
+                "verts": (
+                    {1: (-1, 0, 1, 1), 2: (-1, 0, 2, 1), 3: (0, 0, 1, 1)},
+                    {1: (0, 0, 0, 0), 2: (-1, 0, 1, 0), 3: (0, 0, 1, 0)},
+                    {
+                        1: (-1, 0, 1, 0),
+                        2: (-1, 0, 1, 1),
+                        3: (0, 0, 1, 1),
+                        4: (0, 0, 1, 0),
+                    },
+                ),
+                "shift": (0, 0, 0, 0),
+            },
+        ),
     },
     "d": {
         "polys": [
@@ -174,6 +260,50 @@ STRIP_TEMPLATES: dict[StripLabel, StripTemplate] = {
                 (1, 3),
             ),
         ],
+        "geometry": (
+            {
+                "verts": (
+                    {1: (0, 0, 0, 0), 2: (0, 0, 0, 1), 3: (0, 1, 0, 0)},
+                    {
+                        1: (0, 1, 0, 0),
+                        2: (0, 0, 0, 1),
+                        3: (0, 0, 1, 1),
+                        4: (0, 1, 1, 0),
+                    },
+                    {1: (0, 1, 1, 0), 2: (0, 0, 1, 1), 3: (0, 1, 1, 1)},
+                    {
+                        1: (0, 0, 1, 1),
+                        2: (-1, 0, 2, 1),
+                        3: (-1, 1, 2, 1),
+                        4: (0, 1, 1, 1),
+                    },
+                    {1: (-1, 0, 2, 1), 2: (-1, 0, 2, 2), 3: (-1, 1, 2, 1)},
+                    {1: (-1, 0, 2, 2), 2: (-1, 1, 2, 2), 3: (-1, 1, 2, 1)},
+                ),
+                "shift": (0, 1, 0, 0),
+            },
+            {
+                "verts": (
+                    {1: (-1, 0, 1, 1), 2: (-1, 0, 1, 2), 3: (-1, 1, 1, 1)},
+                    {
+                        1: (-1, 1, 1, 1),
+                        2: (-1, 0, 1, 2),
+                        3: (-1, 0, 2, 2),
+                        4: (-1, 1, 2, 1),
+                    },
+                    {1: (-1, 1, 2, 1), 2: (-1, 0, 2, 2), 3: (-1, 1, 2, 2)},
+                    {
+                        1: (0, 0, 0, 0),
+                        2: (-1, 0, 1, 0),
+                        3: (-1, 1, 1, 0),
+                        4: (0, 1, 0, 0),
+                    },
+                    {1: (-1, 0, 1, 0), 2: (-1, 0, 1, 1), 3: (-1, 1, 1, 0)},
+                    {1: (-1, 1, 1, 0), 2: (-1, 0, 1, 1), 3: (-1, 1, 1, 1)},
+                ),
+                "shift": (0, 1, 0, 0),
+            },
+        ),
     },
     "e": {
         "polys": [
@@ -222,6 +352,50 @@ STRIP_TEMPLATES: dict[StripLabel, StripTemplate] = {
                 (2, 1),
             ),
         ],
+        "geometry": (
+            {
+                "verts": (
+                    {1: (0, 1, 0, -1), 2: (0, 0, 0, 0), 3: (0, 1, 0, 0)},
+                    {
+                        1: (0, 0, 0, 0),
+                        2: (-1, 0, 1, 0),
+                        3: (-1, 1, 1, 0),
+                        4: (0, 1, 0, 0),
+                    },
+                    {1: (-1, 0, 1, 0), 2: (-1, 0, 1, 1), 3: (-1, 1, 1, 0)},
+                    {
+                        1: (-1, 1, 1, 0),
+                        2: (-1, 0, 1, 1),
+                        3: (-1, 0, 2, 1),
+                        4: (-1, 1, 2, 0),
+                    },
+                    {1: (-1, 1, 2, 0), 2: (-1, 0, 2, 1), 3: (-1, 1, 2, 1)},
+                    {1: (-1, 0, 2, 1), 2: (-1, 0, 2, 2), 3: (-1, 1, 2, 1)},
+                ),
+                "shift": (0, 1, 0, -1),
+            },
+            {
+                "verts": (
+                    {1: (0, 1, 1, 0), 2: (0, 0, 1, 1), 3: (0, 1, 1, 1)},
+                    {
+                        1: (0, 0, 1, 1),
+                        2: (-1, 0, 2, 1),
+                        3: (-1, 1, 2, 1),
+                        4: (0, 1, 1, 1),
+                    },
+                    {1: (-1, 0, 2, 1), 2: (-1, 0, 2, 2), 3: (-1, 1, 2, 1)},
+                    {
+                        1: (0, 1, 0, -1),
+                        2: (0, 0, 0, 0),
+                        3: (0, 0, 1, 0),
+                        4: (0, 1, 1, -1),
+                    },
+                    {1: (0, 1, 1, -1), 2: (0, 0, 1, 0), 3: (0, 1, 1, 0)},
+                    {1: (0, 0, 1, 0), 2: (0, 0, 1, 1), 3: (0, 1, 1, 0)},
+                ),
+                "shift": (0, 1, 0, -1),
+            },
+        ),
     },
 }
 
@@ -621,6 +795,48 @@ class LongCuspConstructor:
         for strip in self.strips:
             for poly in strip:
                 yield poly
+
+    def cusp_geometry(self):
+
+        n = len(self.long_cusp_pattern)
+        cusp_geo = CuspGeometry()
+
+        offset = CyclotomicInt(0, 0, 0, 0)
+
+        tile_variant = 0
+
+        t_idx = 0
+        s_idx = 0
+        x_ = ""
+
+        for i in range(n):
+            x = self.long_cusp_pattern[i]
+            xx = x_ + x
+
+            if xx == "cc" or xx == "de":
+                tile_variant = (tile_variant + 1) % 2
+
+            strip_geo = STRIP_TEMPLATES[x]["geometry"][tile_variant]
+            strip_polys = STRIP_TEMPLATES[x]["polys"]
+            shift = CyclotomicInt(*strip_geo["shift"])
+
+            for j in range(len(strip_polys)):
+                if strip_polys[j] == TRI:
+                    cell = Tri(t_idx)
+                    t_idx += 1
+                else:
+                    cell = Sqr(s_idx)
+                    s_idx += 1
+
+                corners = {
+                    k: CyclotomicInt(*v) for k, v in strip_geo["verts"][j].items()
+                }
+                cusp_geo.set_cell(cell, corners, offset)
+
+            offset = offset + shift
+            x_ = x
+
+        return cusp_geo
 
     def connect_strips(self, idx: int) -> None:
         """Apply inter-strip edge pairings at position *idx* in the cyclic pattern.

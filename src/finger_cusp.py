@@ -55,6 +55,8 @@ from base import (
 )
 
 from construction import Cusp
+from cusp_geometry import CuspGeometry
+from cyclotomic import CyclotomicInt
 
 FingerPattern = list[int]
 """A cyclic sequence of 0/1 values encoding finger orientations (1=plus, 0=minus)."""
@@ -296,6 +298,79 @@ class FingerCuspConstructor:
             yield Sqr(i)
             yield Tri(2 * i)
             yield Tri(2 * i + 1)
+
+    def cusp_geometry(self) -> CuspGeometry:
+        """Build the complete cusp tiling by adding and connecting all fingers.
+
+        First creates all finger strips, then connects consecutive pairs
+        (including the wrap-around from last to first) using positive or
+        negative connections according to the pattern.
+
+        Returns:
+            The populated ``Cusp`` object with all cells and edge pairings.
+        """
+        n = len(self.finger_pattern)
+        geo = CuspGeometry()
+
+        offset = CyclotomicInt(0, 0, 0, 0)
+
+        for i in range(n):
+            if self.finger_pattern[i] == 1:
+                geo.set_cell(
+                    Sqr(i),
+                    {
+                        1: offset + CyclotomicInt(0, 0, 0, 0),
+                        2: offset + CyclotomicInt(0, 0, 0, 1),
+                        3: offset + CyclotomicInt(1, 0, 0, 1),
+                        4: offset + CyclotomicInt(1, 0, 0, 0),
+                    },
+                )
+                geo.set_cell(
+                    Tri(2 * i),
+                    {
+                        1: offset + CyclotomicInt(0, 0, 0, 1),
+                        2: offset + CyclotomicInt(0, 0, 1, 1),
+                        3: offset + CyclotomicInt(1, 0, 0, 1),
+                    },
+                )
+                geo.set_cell(
+                    Tri(2 * i + 1),
+                    {
+                        1: offset + CyclotomicInt(1, 0, 0, 1),
+                        2: offset + CyclotomicInt(0, 0, 1, 1),
+                        3: offset + CyclotomicInt(1, 0, 1, 1),
+                    },
+                )
+                offset += CyclotomicInt(1, 0, 0, 0)
+            else:
+                geo.set_cell(
+                    Sqr(i),
+                    {
+                        1: offset + CyclotomicInt(0, 0, 1, 1),
+                        2: offset + CyclotomicInt(0, 0, 0, 1),
+                        3: offset + CyclotomicInt(0, 1, 0, 0),
+                        4: offset + CyclotomicInt(0, 1, 1, 0),
+                    },
+                )
+                geo.set_cell(
+                    Tri(2 * i),
+                    {
+                        1: offset + CyclotomicInt(0, 0, 0, 1),
+                        2: offset + CyclotomicInt(0, 0, 0, 0),
+                        3: offset + CyclotomicInt(0, 1, 0, 0),
+                    },
+                )
+                geo.set_cell(
+                    Tri(2 * i + 1),
+                    {
+                        1: offset + CyclotomicInt(0, 1, 0, 0),
+                        2: offset + CyclotomicInt(0, 0, 0, 0),
+                        3: offset + CyclotomicInt(0, 1, 0, -1),
+                    },
+                )
+                offset += CyclotomicInt(0, 1, 0, -1)
+
+        return geo
 
 
 class MultiFingerCuspConstructor:

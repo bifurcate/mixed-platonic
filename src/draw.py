@@ -62,7 +62,12 @@ def distribute_indices(n):
     while step:
         result += [i + step for i in result]
         step //= 2
-    return result[:n]
+    result = result[:n]
+    seen = set(result)
+    for i in range(n):
+        if i not in seen:
+            result.append(i)
+    return result
 
 
 def generate_spread_color_map(n, s=0.8, v=0.9):

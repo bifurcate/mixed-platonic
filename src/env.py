@@ -67,12 +67,21 @@ def read_state(env_path: Path) -> str:
     return state_data["state"]
 
 
-def write_config(env_path: Path, num_tets: int, num_octs: int, cusp: Cusp, traversal):
+def write_config(
+    env_path: Path,
+    num_tets: int,
+    num_octs: int,
+    cusp: Cusp,
+    traversal,
+    pattern: str | None = None,
+    pattern_type: str | None = None,
+):
     """Write the search configuration to config.json.
 
     The config captures everything the solver needs to reconstruct the cusp
     tiling and run the search: cell counts, serialized cusp pairings, and
-    the traversal order for embedding cells.
+    the traversal order for embedding cells. The originating cusp pattern
+    and its type are also recorded so the environment is self-describing.
 
     Args:
         env_path: Path to the environment directory.
@@ -80,11 +89,19 @@ def write_config(env_path: Path, num_tets: int, num_octs: int, cusp: Cusp, trave
         num_octs: Number of octahedra in the decomposition.
         cusp: The cusp tiling with all edge pairings defined.
         traversal: Ordered list of cusp cells to embed during search.
+        pattern: Source pattern string used to construct the cusp (e.g.
+            ``"++--++--"`` for a finger pattern). ``None`` if the cusp was
+            built directly without a pattern (e.g. via ``examples.py``).
+        pattern_type: Label for the pattern's construction scheme: one of
+            ``"finger"``, ``"multi_finger"``, ``"long_cusp"``, matching
+            the labels used in census manifests. ``None`` if no pattern.
     """
     config_data = {
         "name": env_path.name,
         "num_tets": num_tets,
         "num_octs": num_octs,
+        "pattern": pattern,
+        "pattern_type": pattern_type,
         "cusp": cusp.dump(),
         "traversal": dump_traversal(traversal),
     }
@@ -100,7 +117,10 @@ def read_config(env_path: Path) -> dict:
         env_path: Path to the environment directory.
 
     Returns:
-        Dict with keys: name, num_tets, num_octs, cusp, traversal.
+        Dict with keys: name, num_tets, num_octs, pattern, pattern_type,
+        cusp, traversal. The ``pattern`` and ``pattern_type`` fields may
+        be ``None`` for environments created without a source pattern, or
+        absent from older configs written before those fields were added.
     """
     config_file_path = Path(env_path) / "config.json"
     with open(config_file_path, "r") as f:
@@ -198,7 +218,15 @@ def remove_checkpoint(env_path: Path):
     checkpoint_path.unlink(missing_ok=True)
 
 
-def create_env(env_path: Path, num_tets: int, num_octs: int, cusp: Cusp, traversal):
+def create_env(
+    env_path: Path,
+    num_tets: int,
+    num_octs: int,
+    cusp: Cusp,
+    traversal,
+    pattern: str | None = None,
+    pattern_type: str | None = None,
+):
     """Create a new search environment directory with config and init state.
 
     Convenience function that combines create_env_dir, write_config, and
@@ -211,7 +239,13 @@ def create_env(env_path: Path, num_tets: int, num_octs: int, cusp: Cusp, travers
         num_octs: Number of octahedra in the decomposition.
         cusp: The cusp tiling with all edge pairings defined.
         traversal: Ordered list of cusp cells to embed during search.
+        pattern: Source pattern string used to construct the cusp, or
+            ``None`` if the cusp was built directly.
+        pattern_type: Label for the pattern's construction scheme, or
+            ``None`` if no pattern.
     """
     create_env_dir(env_path)
-    write_config(env_path, num_tets, num_octs, cusp, traversal)
+    write_config(
+        env_path, num_tets, num_octs, cusp, traversal, pattern, pattern_type
+    )
     write_state(env_path, "init")

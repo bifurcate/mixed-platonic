@@ -121,6 +121,48 @@ def plot_runtime_histogram(ax: plt.Axes, census_data: dict) -> None:
     ax.set_title("Distribution of Solver Runtime Across Environments")
 
 
+def extract_iterations(census_data: dict) -> list[int]:
+    """Extract iterations values from all environments that have info.
+
+    Args:
+        census_data: Combined census data from data.json.
+
+    Returns:
+        List of iteration counts.
+    """
+    values = []
+    for env_data in census_data.values():
+        info = env_data.get("info")
+        if info is None:
+            continue
+        iterations = info.get("iterations")
+        if iterations is not None:
+            values.append(iterations)
+    return values
+
+
+def plot_iterations_histogram(ax: plt.Axes, census_data: dict) -> None:
+    """Plot a histogram of info.iterations across environments.
+
+    Args:
+        ax: Matplotlib axes to draw on.
+        census_data: Combined census data from data.json.
+    """
+    values = extract_iterations(census_data)
+    if not values:
+        ax.text(
+            0.5, 0.5, "No iterations data available",
+            ha="center", va="center", transform=ax.transAxes,
+        )
+        return
+
+    ax.hist(values, bins="auto", edgecolor="black", alpha=0.7)
+    ax.yaxis.get_major_locator().set_params(integer=True)
+    ax.set_xlabel("Iterations")
+    ax.set_ylabel("Count")
+    ax.set_title("Distribution of Solver Iterations Across Environments")
+
+
 def extract_info_pairs(
     census_data: dict, key_x: str, key_y: str
 ) -> tuple[list, list]:
@@ -184,6 +226,12 @@ def generate_pdf(census_data: dict, output_path: Path) -> None:
 
         fig, ax = plt.subplots(figsize=(8, 5))
         plot_runtime_histogram(ax, census_data)
+        fig.tight_layout()
+        pdf.savefig(fig)
+        plt.close(fig)
+
+        fig, ax = plt.subplots(figsize=(8, 5))
+        plot_iterations_histogram(ax, census_data)
         fig.tight_layout()
         pdf.savefig(fig)
         plt.close(fig)
