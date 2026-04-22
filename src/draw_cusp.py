@@ -32,7 +32,7 @@ from pathlib import Path
 
 import cairo
 
-from base import CuspCell
+from base import CuspCell, MANIFOLD_CELL_TYPE_SHORT_LABEL
 from construction import Construction, Cusp, Embeddings, load_traversal
 from cusp_geometry import CuspGeometry
 from draw import (
@@ -100,12 +100,29 @@ def draw_empty_cell(ctx: cairo.Context, verts: list[tuple[float, float]]) -> Non
     ctx.restore()
 
 
+def _blend_white(rgb: tuple[float, float, float], factor: float) -> tuple[float, float, float]:
+    """Blend an ``(r, g, b)`` color toward white by ``factor`` in [0, 1].
+
+    ``factor=0`` returns the color unchanged; ``factor=1`` returns white.
+    """
+    r, g, b = rgb
+    return (
+        r + factor * (1 - r),
+        g + factor * (1 - g),
+        b + factor * (1 - b),
+    )
+
+
 def draw_embedded_cell(
     ctx: cairo.Context,
     verts: list[tuple[float, float]],
     embedding_labels,
     color_map,
     color_idx: int,
+    annotation: str | None = None,
+    lighten: bool = False,
+    bold_edges: bool = False,
+    manifold_label: str | None = None,
 ) -> None:
     """Fill a cell with a color-coded manifold cell and label its vertices.
 
@@ -121,6 +138,14 @@ def draw_embedded_cell(
             vertex indices matching ``verts``.
         color_map: Precomputed list of RGB tuples.
         color_idx: Index into ``color_map`` selecting this cell's fill color.
+        annotation: Optional small tag (e.g. ``"3R*"``) rendered near the
+            centroid to carry solver-state info for debug illustrations.
+        lighten: When True, blend the fill color toward white so this cell
+            reads as visually lighter (used to mark induced embeddings).
+        bold_edges: When True, stroke the cell outline with a heavier
+            line width (used to highlight the current stack frame).
+        manifold_label: Optional short identifier (e.g. ``"TET[0]"``)
+            rendered opposite the stack-annotation slot.
     """
     ctx.save()
 
@@ -130,10 +155,18 @@ def draw_embedded_cell(
     ctx.close_path()
 
     r, g, b = color_map[color_idx]
+    if lighten:
+        r, g, b = _blend_white((r, g, b), 0.5)
     ctx.set_source_rgb(r, g, b)
     ctx.fill_preserve()
     ctx.set_source_rgb(0, 0, 0)
-    ctx.stroke()
+    if bold_edges:
+        saved_line_width = ctx.get_line_width()
+        ctx.set_line_width(saved_line_width * 3.0)
+        ctx.stroke()
+        ctx.set_line_width(saved_line_width)
+    else:
+        ctx.stroke()
 
     ctx.set_source_rgb(0, 0, 0)
     centroid = get_centroid(verts)
@@ -142,6 +175,31 @@ def draw_embedded_cell(
     for i, p in enumerate(verts):
         p_ = nudge_to_centroid(p, centroid, 0.35)
         show_centered_text(ctx, p_[0], p_[1], str(embedding_labels[i + 1]))
+
+    if annotation or manifold_label:
+        # Smaller font for the tag/manifold label; the stack tag sits
+        # between corner 1's label and the centroid, the manifold label
+        # sits on the opposite side near the last corner.
+        small_font_size = 0.10
+        saved_matrix = ctx.get_font_matrix()
+        ctx.set_font_matrix(
+            cairo.Matrix(
+                xx=small_font_size, yx=0, xy=0, yy=-small_font_size, x0=0, y0=0
+            )
+        )
+        if annotation:
+            ctx.select_font_face(
+                "Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD
+            )
+            tag_pos = nudge_to_centroid(verts[0], centroid, 0.65)
+            show_centered_text(ctx, tag_pos[0], tag_pos[1], annotation)
+            ctx.select_font_face(
+                "Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL
+            )
+        if manifold_label:
+            ml_pos = nudge_to_centroid(verts[-1], centroid, 0.65)
+            show_centered_text(ctx, ml_pos[0], ml_pos[1], manifold_label)
+        ctx.set_font_matrix(saved_matrix)
 
     ctx.restore()
 
@@ -162,6 +220,9 @@ def draw_cusp(
     width: int = 2048,
     height: int = 1024,
     margin: int = 50,
+    annotations: dict[CuspCell, str] | None = None,
+    induced_cells: set[CuspCell] | None = None,
+    bold_edge_cells: set[CuspCell] | None = None,
 ) -> None:
     """Render the cusp cellulation to ``output_filename``.
 
@@ -177,6 +238,14 @@ def draw_cusp(
         width: Output canvas width in device pixels.
         height: Output canvas height in device pixels.
         margin: Padding in device pixels between content bbox and canvas.
+        annotations: Optional ``{cusp_cell: tag}`` map; matched embedded
+            cells render the tag near their centroid (debug feature).
+        induced_cells: Optional set of cusp cells whose fill should be
+            lightened to distinguish induced embeddings from iterator
+            candidates (debug feature).
+        bold_edge_cells: Optional set of cusp cells whose outlines should
+            be stroked heavier, used to highlight the current stack
+            frame (debug feature).
     """
     surface = _make_surface(output_filename, width, height)
     ctx = cairo.Context(surface)
@@ -203,8 +272,8 @@ def draw_cusp(
     ctx.set_line_width(4.0 / scale)
 
     # Font matrix: y-flipped to counteract the ctx.scale(_, -scale) above.
-    ctx.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-    font_size = 0.18
+    ctx.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+    font_size = 0.162
     ctx.set_font_matrix(
         cairo.Matrix(xx=font_size, yx=0, xy=0, yy=-font_size, x0=0, y0=0)
     )
@@ -225,8 +294,24 @@ def draw_cusp(
             color_idx = embedding.manifold_cell.cell_index
         else:
             color_idx = construction.num_tets + embedding.manifold_cell.cell_index
+        annotation = annotations.get(cusp_cell) if annotations else None
+        lighten = bool(induced_cells and cusp_cell in induced_cells)
+        bold_edges = bool(bold_edge_cells and cusp_cell in bold_edge_cells)
+        m = embedding.manifold_cell
+        manifold_label = (
+            f"{MANIFOLD_CELL_TYPE_SHORT_LABEL[m.cell_type].upper()}"
+            f"[{m.cell_index}]"
+        )
         draw_embedded_cell(
-            ctx, verts, embedding.embedding_spec, color_map, color_idx
+            ctx,
+            verts,
+            embedding.embedding_spec,
+            color_map,
+            color_idx,
+            annotation=annotation,
+            lighten=lighten,
+            bold_edges=bold_edges,
+            manifold_label=manifold_label,
         )
 
     if output_filename.endswith(".png"):

@@ -584,7 +584,7 @@ class Solver:
                 self.max_embeddings_state = self.construction.embeddings.dump()
 
             if self._on_step is not None:
-                self._on_step(self.construction, self.counter)
+                self._on_step(self.construction, self.counter, self.stack)
 
             # Step 5: Check if all cusp cells are now embedded
             next_tr_idx = self.get_least_available_cusp_cell_idx()

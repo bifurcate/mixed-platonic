@@ -87,6 +87,51 @@ poetry run python src/solve.py my_search
 poetry run python src/solve.py my_search
 ```
 
+### Debugging the solver
+
+`solve.py` exposes two debug flags that are off by default and incur no
+cost in production runs. Both write into the search environment directory.
+
+**`--debug-draw`** renders the cusp tiling after each successful solver
+step (iterator placement or induced embedding) to
+`<env>/debug/step_NNNNNN.png` using pycairo. Each embedded cell is
+tagged with its stack origin:
+
+- `{depth}R`  — iterator candidate at stack depth `depth`
+- `{depth}R*` — iterator candidate with `init = True` (unconstrained
+  symmetry-breaking start)
+- `{depth}I`  — embedding induced by constraint propagation at
+  stack depth `depth`
+
+Iterator placements get full-saturation fills; induced placements are
+blended toward white so the origin is visually distinguishable.
+
+```sh
+poetry run python src/solve.py my_search --debug-draw
+```
+
+**`--debug-trace`** appends a JSON record per iteration to
+`<env>/trace.jsonl` containing the solver's stack snapshot and any
+consistency violation recorded during that iteration. Safe to combine
+with stop/resume — records from prior runs are preserved on resume.
+
+```sh
+poetry run python src/solve.py my_search --debug-trace
+```
+
+`trace_table.py` renders a trace as a LaTeX table (one row per
+iteration, one column per stack depth, plus a violation column). Stack
+cells read `cusp_cell -> manifold_cell/spec (+n)` where `+n` counts
+embeddings induced at that frame.
+
+```sh
+poetry run python src/trace_table.py my_search -o trace.tex
+poetry run python src/trace_table.py my_search --longtable --max-iters 200
+```
+
+Both flags are intended for small environments — rendering PNGs and
+writing per-iteration JSON slows the solver substantially.
+
 ### 3. Analyze results
 
 Extract Regina isomorphism signatures from completed solutions:
@@ -138,7 +183,9 @@ census directory — a file-based claiming protocol prevents duplicated work.
 
 ### Visualization
 
-The `draw.py` module can render cusp tilings with embedding annotations using pycairo.
+`draw.py` provides low-level pycairo primitives; `draw_cusp.py` renders
+cusp tilings with embedding annotations (used by `--debug-draw` and by
+the `visualize_census.py` tool).
 
 ## Project structure
 
@@ -147,25 +194,35 @@ src/
   base.py                 Core data structures (cells, pairings, embeddings)
   construction.py         Cusp tiling, embedding collection, constraint propagation
   solver.py               Backtracking search with checkpoint/resume
+  cyclotomic.py           Exact cyclotomic integer arithmetic for cusp coordinates
+  cusp_geometry.py        Geometric layout of cusp tilings
   finger_cusp.py          Finger (short-meridian) cusp pattern constructor
   long_cusp.py            Long-meridian cusp pattern constructor
   bracelets.py            Bracelet/necklace enumeration (rotation, reflection, optional complement)
   binary_loop.py          Discrete calculus on cyclic binary (mod 2) sequences
   pattern_restriction.py  Short-meridian pattern enumeration via rank spectrum
+  gen_perms.py            Tetrahedron/octahedron permutation table generation
   env.py                  Search environment I/O (config, state, checkpoints)
   construct.py            CLI: create a single search environment
   generate_census.py      CLI: enumerate patterns and write a census manifest
   construct_census.py     CLI: build environments from a census manifest
-  solve.py                CLI: run the solver (supports stop/resume)
+  solve.py                CLI: run the solver (supports stop/resume, --debug-draw, --debug-trace)
   solve_census.py         CLI: distributed worker that solves a census
   analyze.py              CLI: extract Regina isomorphism signatures
   analyze_census.py       CLI: report census status and completions
+  gather_census.py        CLI: aggregate per-environment results across a census
+  backfill_census.py      CLI: backfill missing outputs on an existing census
   export_regina.py        Convert cellulations to Regina triangulations
-  draw.py                 Cusp visualization (pycairo)
+  export_census_csv.py    CLI: export census results as CSV
+  visualize_census.py     CLI: render cusp illustrations across a census
+  draw.py                 Low-level pycairo primitives
+  draw_cusp.py            Cusp tiling renderer (supports stack annotations)
+  trace_table.py          CLI: render --debug-trace output as a LaTeX table
   examples.py             Example cusp configurations
 tests/
   test_base.py            Tests for core data structures
   test_construction.py    Tests for construction and constraint propagation
+  test_cusp_geometry.py   Tests for cusp geometric layout
   test_finger_cusp.py     Tests for finger pattern generation
   test_long_cusp.py       Tests for long cusp pattern generation
 ```

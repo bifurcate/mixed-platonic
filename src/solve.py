@@ -156,8 +156,31 @@ def solve(env_path, debug_draw: bool = False, debug_trace: bool = False):
         debug_dir = env_path / "debug"
         debug_dir.mkdir(exist_ok=True)
 
-        def on_step(construction, step_num):
-            draw_cusp(geo, construction, str(debug_dir / f"step_{step_num:06d}.png"))
+        def on_step(construction, step_num, stack):
+            annotations: dict = {}
+            induced_cells: set = set()
+            bold_edge_cells: set = set()
+            for depth, frame in enumerate(stack, start=1):
+                if frame.embedding is not None:
+                    tag = f"{depth}R*" if frame.init else f"{depth}R"
+                    annotations[frame.embedding.cusp_cell] = tag
+                for ie in frame.induced_embeddings:
+                    annotations[ie.cusp_cell] = f"{depth}I"
+                    induced_cells.add(ie.cusp_cell)
+            if stack:
+                top = stack[-1]
+                if top.embedding is not None:
+                    bold_edge_cells.add(top.embedding.cusp_cell)
+                for ie in top.induced_embeddings:
+                    bold_edge_cells.add(ie.cusp_cell)
+            draw_cusp(
+                geo,
+                construction,
+                str(debug_dir / f"step_{step_num:06d}.png"),
+                annotations=annotations,
+                induced_cells=induced_cells,
+                bold_edge_cells=bold_edge_cells,
+            )
 
     on_trace = None
     trace_file = None
