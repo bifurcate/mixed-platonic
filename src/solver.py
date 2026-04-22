@@ -279,6 +279,8 @@ class Solver:
         construction: Construction,
         num_tets: int,
         num_octs: int,
+        on_step=None,
+        on_trace=None,
     ) -> None:
         self.construction = construction
         self.traversal = traversal
@@ -299,6 +301,8 @@ class Solver:
         self.violation_counts: dict[str, int] = {}
         self.max_embeddings: int = 0
         self.max_embeddings_state: list[tuple] | None = None
+        self._on_step = on_step
+        self._on_trace = on_trace
 
     def request_stop(self) -> None:
         """Signal the solver to stop at the next safe point.
@@ -548,10 +552,12 @@ class Solver:
             # Step 4b: Propagate induced embeddings to fixpoint
             frame.induced_embeddings = []
             ok = True
+            current_violation: str | None = None
             while True:
                 ok_inner, _, next_induced, violation = self.get_next_induced()
                 if not ok_inner:
                     ok = False
+                    current_violation = violation
                     self.violation_counts[violation] = (
                         self.violation_counts.get(violation, 0) + 1
                     )
@@ -561,6 +567,13 @@ class Solver:
                 frame.induced_embeddings.append(next_induced)
                 self.construction.embeddings.add_embedding(next_induced)
 
+            if self._on_trace is not None:
+                self._on_trace(
+                    self.counter,
+                    [f.dump() for f in self.stack],
+                    current_violation,
+                )
+
             if not ok:
                 continue  # Contradiction — will backtrack on next iteration
 
@@ -569,6 +582,9 @@ class Solver:
             if current_size > self.max_embeddings:
                 self.max_embeddings = current_size
                 self.max_embeddings_state = self.construction.embeddings.dump()
+
+            if self._on_step is not None:
+                self._on_step(self.construction, self.counter)
 
             # Step 5: Check if all cusp cells are now embedded
             next_tr_idx = self.get_least_available_cusp_cell_idx()

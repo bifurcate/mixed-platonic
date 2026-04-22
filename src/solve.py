@@ -59,7 +59,7 @@ def log_config(config):
     logging.info(f"traversal: {config['traversal']}")
 
 
-def solve(env_path):
+def solve(env_path, debug_draw: bool = False, debug_trace: bool = False):
     """Run the solver on a single search environment.
 
     Loads the config, builds the cusp tiling and construction, runs the
@@ -73,6 +73,11 @@ def solve(env_path):
 
     Args:
         env_path: Path to a search environment directory.
+        debug_draw: If True, render the cusp and embeddings to
+            ``<env_path>/debug/`` at each solver step. Off by default.
+        debug_trace: If True, append a per-iteration record to
+            ``<env_path>/trace.jsonl`` containing the solver stack and
+            any consistency violation. Off by default.
 
     Returns:
         ``"completed"`` if the solver finished the search, ``"stopped"``
@@ -142,7 +147,45 @@ def solve(env_path):
 
     embeddings = Embeddings()
     construction = Construction(cusp, embeddings)
-    solver = Solver(traversal, construction, num_tets, num_octs)
+
+    on_step = None
+    if debug_draw:
+        from draw_cusp import build_geometry_for_config, draw_cusp
+
+        geo = build_geometry_for_config(config)
+        debug_dir = env_path / "debug"
+        debug_dir.mkdir(exist_ok=True)
+
+        def on_step(construction, step_num):
+            draw_cusp(geo, construction, str(debug_dir / f"step_{step_num:06d}.png"))
+
+    on_trace = None
+    trace_file = None
+    if debug_trace:
+        trace_path = env_path / "trace.jsonl"
+        # Append when resuming so prior iterations are preserved.
+        trace_file = open(trace_path, "a" if resuming else "w", encoding="utf-8")
+
+        def on_trace(counter, stack_snapshot, violation):
+            trace_file.write(
+                json.dumps(
+                    {
+                        "counter": counter,
+                        "stack": stack_snapshot,
+                        "violation": violation,
+                    }
+                )
+                + "\n"
+            )
+
+    solver = Solver(
+        traversal,
+        construction,
+        num_tets,
+        num_octs,
+        on_step=on_step,
+        on_trace=on_trace,
+    )
 
     if resuming:
         solver.load_checkpoint(checkpoint)
@@ -164,7 +207,11 @@ def solve(env_path):
     signal.signal(signal.SIGTERM, handle_stop)
 
     start_time = time.perf_counter()
-    result = solver.run()
+    try:
+        result = solver.run()
+    finally:
+        if trace_file is not None:
+            trace_file.close()
     end_time = time.perf_counter()
 
     # Restore original signal handlers
@@ -227,12 +274,22 @@ def main():
     )
 
     parser.add_argument("name", type=str, help="Name of the search environment")
+    parser.add_argument(
+        "--debug-draw",
+        action="store_true",
+        help="Draw the cusp and embeddings at each solver step (slow)",
+    )
+    parser.add_argument(
+        "--debug-trace",
+        action="store_true",
+        help="Append per-iteration stack snapshots to trace.jsonl (slow)",
+    )
 
     args = parser.parse_args()
     name = args.name
     env_path = Path(name)
 
-    solve(env_path)
+    solve(env_path, debug_draw=args.debug_draw, debug_trace=args.debug_trace)
 
 
 if __name__ == "__main__":

@@ -25,6 +25,7 @@ Polygon counts per strip label (triangles, squares)::
     d → 4 tri, 2 sqr    e → 4 tri, 2 sqr
 """
 
+import re
 from collections.abc import Iterator
 
 from base import CuspCell, Sqr, Tri, SQR, TRI
@@ -698,7 +699,10 @@ def next_seq_gen(gen: list[str]) -> list[str]:
     return next_gen
 
 
-def generate_long_cusp(n: int) -> list[LongCuspPattern]:
+def generate_long_cusp(
+    n: int,
+    pattern_filter: str | re.Pattern | None = None,
+) -> list[LongCuspPattern]:
     """Enumerate all valid long-cusp patterns up to length *n*.
 
     Grows sequences from single-character seeds using the transition graph,
@@ -710,27 +714,75 @@ def generate_long_cusp(n: int) -> list[LongCuspPattern]:
     - The pattern is the canonical (lexicographically largest) rotation of
       its equivalence class, avoiding duplicate patterns.
 
+    If *pattern_filter* is given, only patterns where
+    ``re.search(pattern_filter, loop)`` succeeds are returned.  The filter is
+    applied during generation: at each step, sequences are checked against the
+    partial string built so far and pruned if it is provably impossible for any
+    extension to produce a match.  Specifically, a sequence *s* is dropped when
+    ``re.search(pattern_filter, s)`` fails *and*
+    ``re.search(pattern_filter, s + probe)`` also fails, where *probe* is a
+    long repetition of the full alphabet.  This correctly prunes sequences that
+    already contain a forbidden prefix or violate a character-class constraint,
+    and is conservative (never incorrectly prunes) for positive substring
+    patterns.
+
     Args:
         n: Maximum number of generation steps (sequence length before
             trimming the closing character).
+        pattern_filter: Optional regex string or compiled pattern.  When
+            provided, only matching patterns are returned.
 
     Returns:
         List of canonical long-cusp pattern strings.
     """
+    compiled: re.Pattern | None
+    if pattern_filter is None:
+        compiled = None
+    elif isinstance(pattern_filter, str):
+        compiled = re.compile(pattern_filter)
+    else:
+        compiled = pattern_filter
+
+    # Probe string appended to partials during feasibility checks.
+    # Constructed as a walk through SEQ_GEN_GRAPH that covers every edge,
+    # including many consecutive c's to handle the c→c self-loop.
+    # Eulerian path: d→e→b→a→b→d→c^(n+2)→e→b, wrapping b→d each repeat.
+    _probe = ("debabd" + "c" * (n + 2) + "eb") * (n + 2) if compiled is not None else ""
+
+    def still_feasible(s: str) -> bool:
+        # Fast path: the pattern already matches somewhere in s.
+        if compiled.search(s):
+            return True
+        # Check whether any extension (approximated by _probe) could match.
+        # This reliably prunes sequences that already contain a forbidden
+        # character or fail a required-prefix constraint.
+        return compiled.search(s + _probe) is not None
+
     c_seqs: list[LongCuspPattern] = []
-    gen: list[str] = ["a", "b", "c", "d", "e"]
+    gen: list[str] = list(SEQ_GEN_GRAPH.keys())
+
+    if compiled is not None:
+        gen = [s for s in gen if still_feasible(s)]
 
     for _ in range(n):
         gen = next_seq_gen(gen)
+        next_gen: list[str] = []
         for s in gen:
-            # Only keep closed loops (last char can transition back to first)
-            if s[0] != s[-1]:
-                continue
+            if s[0] == s[-1]:
+                loop = s[:-1]
+                p_count = get_poly_count(loop)
+                if (
+                    p_count[0] % 4 == 0
+                    and p_count[1] % 6 == 0
+                    and is_canonical(loop)
+                    and (compiled is None or compiled.search(loop))
+                ):
+                    c_seqs.append(loop)
 
-            loop = s[:-1]
-            p_count = get_poly_count(loop)
-            if p_count[0] % 4 == 0 and p_count[1] % 6 == 0 and is_canonical(loop):
-                c_seqs.append(loop)
+            if compiled is None or still_feasible(s):
+                next_gen.append(s)
+
+        gen = next_gen
 
     return c_seqs
 

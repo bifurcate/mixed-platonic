@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 from base import (
@@ -130,3 +132,78 @@ def test_next_seq_gen():
 
     gen = ["a", "b", "c", "d", "e"]
     next_gen = next_seq_gen(gen)
+
+
+# --- pattern_filter tests ---
+
+_N = 12
+_all_patterns = generate_long_cusp(_N)
+
+
+def _reference(regex: str) -> set[str]:
+    """Post-filter the unfiltered set — the ground truth for pattern_filter."""
+    return {p for p in _all_patterns if re.search(regex, p)}
+
+
+@pytest.mark.parametrize(
+    "regex",
+    [
+        "d",           # contains at least one d
+        "de",          # contains the transition de
+        "cc",          # contains two consecutive c's
+        r"d.*d",       # contains d at least twice
+        r"^[abc]+$",   # only a, b, c characters
+        r"^[bde]+$",   # only b, d, e characters
+        r"^e",         # starts with e
+        r"^d",         # starts with d
+    ],
+)
+def test_filter_matches_reference(regex):
+    """pattern_filter must produce exactly the same set as post-filtering."""
+    result = set(generate_long_cusp(_N, regex))
+    assert result == _reference(regex)
+
+
+def test_filter_none_matches_all():
+    """pattern_filter=None must be identical to no filter."""
+    assert set(generate_long_cusp(_N, None)) == set(_all_patterns)
+
+
+def test_filter_compiled_pattern():
+    """Accepts a pre-compiled re.Pattern as well as a string."""
+    regex = "de"
+    compiled = re.compile(regex)
+    assert set(generate_long_cusp(_N, compiled)) == _reference(regex)
+
+
+def test_filter_result_is_subset():
+    """Every filtered result is contained in the unfiltered set."""
+    filtered = generate_long_cusp(_N, "d")
+    assert set(filtered) <= set(_all_patterns)
+
+
+def test_filter_all_satisfy_regex():
+    """Every returned pattern actually matches the regex."""
+    regex = r"d.*d"
+    for p in generate_long_cusp(_N, regex):
+        assert re.search(regex, p), f"{p!r} returned but does not match {regex!r}"
+
+
+def test_filter_no_false_positives():
+    """No returned pattern violates the regex."""
+    regex = r"^[abc]+$"
+    for p in generate_long_cusp(_N, regex):
+        assert re.search(regex, p), f"{p!r} violates {regex!r}"
+
+
+def test_filter_impossible_regex_returns_empty():
+    """A regex that no pattern can satisfy returns an empty list."""
+    # 'f' is not in the alphabet, so no pattern can contain it.
+    assert generate_long_cusp(_N, "f") == []
+
+
+def test_filter_nonempty_for_known_matches():
+    """Sanity check that a lax filter actually returns results."""
+    # Every pattern contains at least one of {a,b,c,d,e}.
+    result = generate_long_cusp(_N, "[abcde]")
+    assert len(result) == len(_all_patterns)

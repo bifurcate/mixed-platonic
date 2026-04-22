@@ -17,6 +17,7 @@ Usage:
     poetry run python src/generate_census.py -n 12 my_manifest.json
     poetry run python src/generate_census.py -m 6 my_manifest.json
     poetry run python src/generate_census.py -l 16 my_manifest.json
+    poetry run python src/generate_census.py -l 16 -f "de" my_manifest.json
 """
 
 import argparse
@@ -118,16 +119,17 @@ def generate_multi_finger_manifest(num_fingers: int) -> dict:
     return {"type": "multi_finger", "patterns": patterns}
 
 
-def generate_long_cusp_manifest(max_length: int) -> dict:
+def generate_long_cusp_manifest(max_length: int, pattern_filter: str | None = None) -> dict:
     """Enumerate long cusp sequences and build a manifest dict.
 
     Args:
         max_length: Maximum sequence length to enumerate.
+        pattern_filter: Optional regex string passed to ``generate_long_cusp``.
 
     Returns:
         Manifest dict with ``type`` and ``patterns`` keys.
     """
-    patterns = list(generate_long_cusp(max_length))
+    patterns = list(generate_long_cusp(max_length, pattern_filter))
     return {"type": "long_cusp", "patterns": patterns}
 
 
@@ -158,6 +160,15 @@ def main():
     )
 
     parser.add_argument(
+        "-f",
+        "--filter",
+        dest="pattern_filter",
+        metavar="REGEX",
+        default=None,
+        help="Regex to filter long cusp patterns (only used with -l)",
+    )
+
+    parser.add_argument(
         "-s",
         "--sort",
         choices=["none", "compression", "entropy"],
@@ -181,7 +192,7 @@ def main():
     elif args.multi_fingers:
         manifest = generate_multi_finger_manifest(args.multi_fingers)
     elif args.long_cusp:
-        manifest = generate_long_cusp_manifest(args.long_cusp)
+        manifest = generate_long_cusp_manifest(args.long_cusp, args.pattern_filter)
     else:
         parser.error("One of -n, -m, or -l is required")
 

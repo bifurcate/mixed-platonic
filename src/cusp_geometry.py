@@ -65,7 +65,7 @@ class CuspGeometry:
         self,
         cusp_cell: CuspCell,
         corners: dict[int, CyclotomicInt],
-        offset: CyclotomicInt = (0, 0, 0, 0),
+        offset: CyclotomicInt = CyclotomicInt(0, 0, 0, 0),
     ) -> None:
         """Assigns multiple corner positions of a single cusp cell.
 

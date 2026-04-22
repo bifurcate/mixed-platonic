@@ -137,11 +137,10 @@ def draw_embedded_cell(
 
     ctx.set_source_rgb(0, 0, 0)
     centroid = get_centroid(verts)
-    ctx.move_to(centroid[0], centroid[1])
-    ctx.show_text(str(embedding_labels[0]))
+    show_centered_text(ctx, centroid[0], centroid[1], str(embedding_labels[0]))
 
     for i, p in enumerate(verts):
-        p_ = nudge_to_centroid(p, centroid, 0.2)
+        p_ = nudge_to_centroid(p, centroid, 0.35)
         show_centered_text(ctx, p_[0], p_[1], str(embedding_labels[i + 1]))
 
     ctx.restore()
@@ -200,12 +199,12 @@ def draw_cusp(
     ctx.scale(scale, -scale)
     ctx.translate(-xmin, -ymin)
 
-    # A 1-device-pixel stroke after the scale is applied.
-    ctx.set_line_width(1.0 / scale)
+    # A 2-device-pixel stroke after the scale is applied.
+    ctx.set_line_width(4.0 / scale)
 
     # Font matrix: y-flipped to counteract the ctx.scale(_, -scale) above.
     ctx.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-    font_size = 0.15
+    font_size = 0.18
     ctx.set_font_matrix(
         cairo.Matrix(xx=font_size, yx=0, xy=0, yy=-font_size, x0=0, y0=0)
     )
