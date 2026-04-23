@@ -4,7 +4,8 @@ Loads the cusp tiling and any saved embeddings from a search environment
 directory, rebuilds the cusp geometry via the appropriate cusp constructor
 (using the ``pattern`` and ``pattern_type`` fields of ``config.json``), and
 renders each state as a PNG/SVG using the 12-cyclotomic corner positions
-from ``CuspGeometry``.
+from ``CuspGeometry``. With ``--format tex`` the same geometry is emitted
+as a TikZ snippet suitable for ``\\input``-ing into a LaTeX document.
 
 Three sources of embedding state can be drawn:
 
@@ -32,7 +33,11 @@ from pathlib import Path
 
 import cairo
 
-from base import CuspCell, MANIFOLD_CELL_TYPE_SHORT_LABEL
+from base import (
+    CUSP_CELL_TYPE_SHORT_LABEL,
+    CuspCell,
+    MANIFOLD_CELL_TYPE_SHORT_LABEL,
+)
 from construction import Construction, Cusp, Embeddings, load_traversal
 from cusp_geometry import CuspGeometry
 from draw import (
@@ -123,6 +128,7 @@ def draw_embedded_cell(
     lighten: bool = False,
     bold_edges: bool = False,
     manifold_label: str | None = None,
+    cusp_label: str | None = None,
 ) -> None:
     """Fill a cell with a color-coded manifold cell and label its vertices.
 
@@ -146,6 +152,8 @@ def draw_embedded_cell(
             line width (used to highlight the current stack frame).
         manifold_label: Optional short identifier (e.g. ``"TET[0]"``)
             rendered opposite the stack-annotation slot.
+        cusp_label: Optional short identifier (e.g. ``"SQR[2]"``)
+            rendered near corner 2.
     """
     ctx.save()
 
@@ -176,7 +184,7 @@ def draw_embedded_cell(
         p_ = nudge_to_centroid(p, centroid, 0.35)
         show_centered_text(ctx, p_[0], p_[1], str(embedding_labels[i + 1]))
 
-    if annotation or manifold_label:
+    if annotation or manifold_label or cusp_label:
         # Smaller font for the tag/manifold label; the stack tag sits
         # between corner 1's label and the centroid, the manifold label
         # sits on the opposite side near the last corner.
@@ -199,6 +207,9 @@ def draw_embedded_cell(
         if manifold_label:
             ml_pos = nudge_to_centroid(verts[-1], centroid, 0.65)
             show_centered_text(ctx, ml_pos[0], ml_pos[1], manifold_label)
+        if cusp_label:
+            cl_pos = nudge_to_centroid(verts[1], centroid, 0.65)
+            show_centered_text(ctx, cl_pos[0], cl_pos[1], cusp_label)
         ctx.set_font_matrix(saved_matrix)
 
     ctx.restore()
@@ -223,21 +234,22 @@ def draw_cusp(
     annotations: dict[CuspCell, str] | None = None,
     induced_cells: set[CuspCell] | None = None,
     bold_edge_cells: set[CuspCell] | None = None,
+    width_cm: float = 14.0,
 ) -> None:
     """Render the cusp cellulation to ``output_filename``.
 
-    Uses the cyclotomic corner positions in ``geo`` to place cells, then
-    overlays per-cell embedding labels (and fills) for any cusp cells that
-    have an embedding in ``construction.embeddings``.
+    Dispatches on the output file extension: ``.png`` and ``.svg`` go
+    through the cairo renderer; ``.tex`` emits a TikZ snippet.
 
     Args:
         geo: Exact cyclotomic geometry of the cusp tiling.
         construction: Carries the cusp (pairings), current embeddings,
             and the manifold-cell counts used to pick colors.
-        output_filename: Target file (``.png`` or ``.svg``).
-        width: Output canvas width in device pixels.
-        height: Output canvas height in device pixels.
-        margin: Padding in device pixels between content bbox and canvas.
+        output_filename: Target file (``.png``, ``.svg``, or ``.tex``).
+        width: (cairo only) Output canvas width in device pixels.
+        height: (cairo only) Output canvas height in device pixels.
+        margin: (cairo only) Padding in device pixels between content
+            bbox and canvas.
         annotations: Optional ``{cusp_cell: tag}`` map; matched embedded
             cells render the tag near their centroid (debug feature).
         induced_cells: Optional set of cusp cells whose fill should be
@@ -246,7 +258,47 @@ def draw_cusp(
         bold_edge_cells: Optional set of cusp cells whose outlines should
             be stroked heavier, used to highlight the current stack
             frame (debug feature).
+        width_cm: (tikz only) Target width of the figure in centimeters;
+            the picture is scaled uniformly so the geometry bbox fits
+            this width.
     """
+    if output_filename.endswith(".tex"):
+        _draw_cusp_tikz(
+            geo,
+            construction,
+            output_filename,
+            annotations=annotations,
+            induced_cells=induced_cells,
+            bold_edge_cells=bold_edge_cells,
+            width_cm=width_cm,
+        )
+        return
+
+    _draw_cusp_cairo(
+        geo,
+        construction,
+        output_filename,
+        width=width,
+        height=height,
+        margin=margin,
+        annotations=annotations,
+        induced_cells=induced_cells,
+        bold_edge_cells=bold_edge_cells,
+    )
+
+
+def _draw_cusp_cairo(
+    geo: CuspGeometry,
+    construction: Construction,
+    output_filename: str,
+    width: int,
+    height: int,
+    margin: int,
+    annotations: dict[CuspCell, str] | None,
+    induced_cells: set[CuspCell] | None,
+    bold_edge_cells: set[CuspCell] | None,
+) -> None:
+    """Render the cusp cellulation to a ``.png`` or ``.svg`` using cairo."""
     surface = _make_surface(output_filename, width, height)
     ctx = cairo.Context(surface)
 
@@ -302,6 +354,10 @@ def draw_cusp(
             f"{MANIFOLD_CELL_TYPE_SHORT_LABEL[m.cell_type].upper()}"
             f"[{m.cell_index}]"
         )
+        cusp_label = (
+            f"{CUSP_CELL_TYPE_SHORT_LABEL[cusp_cell.cell_type].upper()}"
+            f"[{cusp_cell.cell_index}]"
+        )
         draw_embedded_cell(
             ctx,
             verts,
@@ -312,12 +368,146 @@ def draw_cusp(
             lighten=lighten,
             bold_edges=bold_edges,
             manifold_label=manifold_label,
+            cusp_label=cusp_label,
         )
 
     if output_filename.endswith(".png"):
         surface.write_to_png(output_filename)
     else:
         surface.finish()
+
+
+def _tikz_coord(p: tuple[float, float], xmin: float, ymin: float) -> str:
+    """Format an ``(x, y)`` point for TikZ, shifted so (xmin, ymin) → origin."""
+    return f"({p[0] - xmin:.4f},{p[1] - ymin:.4f})"
+
+
+def _tikz_rgb(rgb: tuple[float, float, float]) -> str:
+    """Format an RGB triple as an xcolor inline expression."""
+    r, g, b = rgb
+    return f"{{rgb,1:red,{r:.4f};green,{g:.4f};blue,{b:.4f}}}"
+
+
+def _draw_cusp_tikz(
+    geo: CuspGeometry,
+    construction: Construction,
+    output_filename: str,
+    annotations: dict[CuspCell, str] | None,
+    induced_cells: set[CuspCell] | None,
+    bold_edge_cells: set[CuspCell] | None,
+    width_cm: float,
+) -> None:
+    """Render the cusp cellulation to a TikZ snippet at ``output_filename``.
+
+    The emitted file contains a single ``tikzpicture`` environment with
+    inline xcolor RGB expressions so snippets can be concatenated without
+    color-name collisions. Requires ``\\usepackage{tikz}`` and
+    ``\\usepackage{xcolor}`` in the consuming document's preamble.
+    """
+    xmin, ymin, xmax, ymax = compute_bounds(geo)
+    w_geo = max(xmax - xmin, 1e-9)
+    h_geo = max(ymax - ymin, 1e-9)
+    scale_cm = width_cm / w_geo
+
+    color_map = generate_spread_color_map(
+        construction.num_tets + construction.num_octs, s=0.8, v=0.9
+    )
+
+    normal_lw_pt = 0.4
+    bold_lw_pt = 1.2
+
+    lines: list[str] = []
+    lines.append(
+        "% TikZ snippet produced by mixed-platonic/draw_cusp.py"
+    )
+    lines.append(
+        "% Requires: \\usepackage{tikz} and \\usepackage{xcolor}"
+    )
+    lines.append(
+        f"\\begin{{tikzpicture}}[x={scale_cm:.4f}cm,y={scale_cm:.4f}cm]"
+    )
+
+    for cusp_cell in geo.cells():
+        if not geo.is_cell_complete(cusp_cell):
+            continue
+        verts = cell_verts(geo, cusp_cell)
+        path = (
+            " -- ".join(_tikz_coord(v, xmin, ymin) for v in verts) + " -- cycle"
+        )
+        embedding = construction.embeddings.get_embedding_by_cusp_cell(cusp_cell)
+
+        if embedding is None:
+            lines.append(
+                f"  \\draw[line width={normal_lw_pt}pt] {path};"
+            )
+            continue
+
+        if embedding.manifold_cell.is_tet():
+            color_idx = embedding.manifold_cell.cell_index
+        else:
+            color_idx = construction.num_tets + embedding.manifold_cell.cell_index
+        lighten = bool(induced_cells and cusp_cell in induced_cells)
+        bold_edges = bool(bold_edge_cells and cusp_cell in bold_edge_cells)
+
+        r, g, b = color_map[color_idx]
+        if lighten:
+            r, g, b = _blend_white((r, g, b), 0.5)
+        fill_expr = _tikz_rgb((r, g, b))
+        lw_pt = bold_lw_pt if bold_edges else normal_lw_pt
+        lines.append(
+            f"  \\filldraw[fill={fill_expr}, draw=black, "
+            f"line width={lw_pt}pt] {path};"
+        )
+
+        spec = embedding.embedding_spec
+        centroid = get_centroid(verts)
+
+        # Centroid label: cusp vertex index.
+        lines.append(
+            f"  \\node[font=\\footnotesize] at "
+            f"{_tikz_coord(centroid, xmin, ymin)} {{{spec[0]}}};"
+        )
+
+        # Corner labels: manifold vertex per corner.
+        for i, p in enumerate(verts):
+            p_ = nudge_to_centroid(p, centroid, 0.35)
+            lines.append(
+                f"  \\node[font=\\footnotesize] at "
+                f"{_tikz_coord(p_, xmin, ymin)} {{{spec[i + 1]}}};"
+            )
+
+        # Small-font tags matching the cairo layout.
+        m = embedding.manifold_cell
+        manifold_label = (
+            f"{MANIFOLD_CELL_TYPE_SHORT_LABEL[m.cell_type].upper()}"
+            f"[{m.cell_index}]"
+        )
+        cusp_label = (
+            f"{CUSP_CELL_TYPE_SHORT_LABEL[cusp_cell.cell_type].upper()}"
+            f"[{cusp_cell.cell_index}]"
+        )
+        annotation = annotations.get(cusp_cell) if annotations else None
+
+        if annotation:
+            tag_pos = nudge_to_centroid(verts[0], centroid, 0.65)
+            lines.append(
+                f"  \\node[font=\\scriptsize\\bfseries] at "
+                f"{_tikz_coord(tag_pos, xmin, ymin)} {{{annotation}}};"
+            )
+        ml_pos = nudge_to_centroid(verts[-1], centroid, 0.65)
+        lines.append(
+            f"  \\node[font=\\scriptsize] at "
+            f"{_tikz_coord(ml_pos, xmin, ymin)} {{{manifold_label}}};"
+        )
+        cl_pos = nudge_to_centroid(verts[1], centroid, 0.65)
+        lines.append(
+            f"  \\node[font=\\scriptsize] at "
+            f"{_tikz_coord(cl_pos, xmin, ymin)} {{{cusp_label}}};"
+        )
+
+    lines.append("\\end{tikzpicture}")
+
+    Path(output_filename).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def build_finger_cusp_geometry(finger_pattern) -> CuspGeometry:
@@ -491,6 +681,8 @@ def build_geometry_for_config(config: dict) -> CuspGeometry:
 
 STATE_CHOICES = ("completions", "max", "checkpoint", "all")
 
+FORMAT_CHOICES = ("png", "svg", "tex")
+
 
 def _render_dump(
     geo: CuspGeometry,
@@ -509,6 +701,7 @@ def draw_env_data(
     env_data: dict,
     output_prefix: str,
     state: str = "all",
+    fmt: str = "png",
 ) -> list[str]:
     """Render cusp images from a unified env-data dict.
 
@@ -524,13 +717,15 @@ def draw_env_data(
     - ``"all"``: every state above that is present.
 
     If none of the selected states are present, writes a single empty-cusp
-    image to ``<prefix>.png``.
+    image to ``<prefix>.<fmt>``.
 
     Args:
         env_data: Gathered per-env draw inputs.
         output_prefix: Path prefix for output files; per-state suffixes
             (``_<i>``, ``_max``, ``_checkpoint``) are appended automatically.
         state: Which states to draw; one of ``STATE_CHOICES``.
+        fmt: Output format; one of ``FORMAT_CHOICES``. ``"tex"`` produces
+            TikZ snippets, the others produce raster/vector images.
 
     Returns:
         List of output file paths written.
@@ -539,6 +734,10 @@ def draw_env_data(
         raise ValueError(
             f"unknown state {state!r}; expected one of {STATE_CHOICES}"
         )
+    if fmt not in FORMAT_CHOICES:
+        raise ValueError(
+            f"unknown fmt {fmt!r}; expected one of {FORMAT_CHOICES}"
+        )
 
     geo = build_geometry_for_config(env_data["config"])
     construction = load_construction_from_config(env_data["config"])
@@ -546,20 +745,20 @@ def draw_env_data(
     written: list[str] = []
     if state in ("completions", "all"):
         for i, dump in enumerate(env_data["completions"]):
-            filename = f"{output_prefix}_{i}.png"
+            filename = f"{output_prefix}_{i}.{fmt}"
             _render_dump(geo, construction, dump, filename)
             written.append(filename)
     if state in ("max", "all") and env_data["max"] is not None:
-        filename = f"{output_prefix}_max.png"
+        filename = f"{output_prefix}_max.{fmt}"
         _render_dump(geo, construction, env_data["max"], filename)
         written.append(filename)
     if state in ("checkpoint", "all") and env_data["checkpoint_dump"] is not None:
-        filename = f"{output_prefix}_checkpoint.png"
+        filename = f"{output_prefix}_checkpoint.{fmt}"
         _render_dump(geo, construction, env_data["checkpoint_dump"], filename)
         written.append(filename)
 
     if not written:
-        filename = f"{output_prefix}.png"
+        filename = f"{output_prefix}.{fmt}"
         _render_dump(geo, construction, None, filename)
         written.append(filename)
 
@@ -570,6 +769,7 @@ def draw_env(
     env_path: Path,
     output_prefix: str | None = None,
     state: str = "all",
+    fmt: str = "png",
 ) -> list[str]:
     """Render cusp images for a search environment directory.
 
@@ -580,11 +780,12 @@ def draw_env(
         output_prefix: Path prefix for output files. Defaults to
             ``<env_path>/cusp``.
         state: Which states to draw; one of ``STATE_CHOICES``.
+        fmt: Output format; one of ``FORMAT_CHOICES``.
     """
     if output_prefix is None:
         output_prefix = str(env_path / "cusp")
     env_data = load_env_data_from_dir(env_path)
-    return draw_env_data(env_data, output_prefix, state=state)
+    return draw_env_data(env_data, output_prefix, state=state, fmt=fmt)
 
 
 def draw_from_data_json(
@@ -592,6 +793,7 @@ def draw_from_data_json(
     output_dir: Path,
     env_name: str | None = None,
     state: str = "all",
+    fmt: str = "png",
 ) -> list[str]:
     """Render cusp images from a census ``data.json`` produced by ``gather_census``.
 
@@ -605,6 +807,7 @@ def draw_from_data_json(
         env_name: Single env name to draw. If ``None``, iterates all envs
             in the data file.
         state: Which states to draw; one of ``STATE_CHOICES``.
+        fmt: Output format; one of ``FORMAT_CHOICES``.
 
     Returns:
         List of output file paths written (across all envs).
@@ -628,7 +831,7 @@ def draw_from_data_json(
     for name in env_names:
         env_data = load_env_data_from_gathered(gathered[name])
         prefix = str(output_dir / name)
-        written.extend(draw_env_data(env_data, prefix, state=state))
+        written.extend(draw_env_data(env_data, prefix, state=state, fmt=fmt))
     return written
 
 
@@ -675,6 +878,16 @@ def main():
         default="all",
         help="Which saved state(s) to render (default: all)",
     )
+    parser.add_argument(
+        "--format",
+        dest="fmt",
+        choices=FORMAT_CHOICES,
+        default="png",
+        help=(
+            "Output format: png/svg (raster/vector images) or tex "
+            "(TikZ snippets). Default: png."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -686,7 +899,11 @@ def main():
             Path(args.output) if args.output else data_path.parent / "draw"
         )
         written = draw_from_data_json(
-            data_path, output_dir, env_name=args.env_name, state=args.state
+            data_path,
+            output_dir,
+            env_name=args.env_name,
+            state=args.state,
+            fmt=args.fmt,
         )
     else:
         if args.env is None:
@@ -696,7 +913,7 @@ def main():
         env_path = Path(args.env)
         if not env_path.is_dir():
             parser.error(f"environment directory does not exist: {env_path}")
-        written = draw_env(env_path, args.output, state=args.state)
+        written = draw_env(env_path, args.output, state=args.state, fmt=args.fmt)
 
     for path in written:
         logging.info(f"Wrote {path}")

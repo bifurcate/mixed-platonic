@@ -340,7 +340,9 @@ def get_vertex_degrees(adj_matrix: AdjMatrix) -> list[int]:
     return degrees
 
 
-def get_nonisomorphic_multigraphs(v: int, e: int) -> list[AdjMatrix]:
+def get_nonisomorphic_multigraphs(
+    v: int, e: int, max_degree: int = 4
+) -> list[AdjMatrix]:
     """Generate all non-isomorphic loopless multigraphs on *v* vertices with *e* edges.
 
     In the short-meridian enumeration, this produces candidate ``G_OO``
@@ -352,9 +354,14 @@ def get_nonisomorphic_multigraphs(v: int, e: int) -> list[AdjMatrix]:
     with degree-sequence pruning and exhaustive permutation checking for
     isomorphism (practical for v <= 7).
 
+    Vertices with degree exceeding *max_degree* are inadmissible: each
+    octahedron has 4 oct-oct faces, so ``G_OO`` degrees are bounded by 4
+    (thesis §5.2.1), matching the keys of ``DEGREE_RANK_MAP``.
+
     Args:
         v: Number of vertices (octahedra).
         e: Total number of edges (oct-oct face pairings).
+        max_degree: Maximum admissible vertex degree. Defaults to 4.
 
     Returns:
         A list of adjacency matrices, one per isomorphism class.
@@ -417,6 +424,9 @@ def get_nonisomorphic_multigraphs(v: int, e: int) -> list[AdjMatrix]:
 
     for edge_multiplicities in distribute_edges(e, num_pairs):
         adj = multigraph_to_adj_matrix(edge_multiplicities, v, pairs)
+
+        if any(d > max_degree for d in get_vertex_degrees(adj)):
+            continue
 
         is_new = True
         for existing_adj in unique_graphs:

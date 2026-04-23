@@ -848,8 +848,28 @@ class LongCuspConstructor:
             for poly in strip:
                 yield poly
 
-    def cusp_geometry(self):
+    def cusp_geometry(self) -> CuspGeometry:
+        """Compute the planar geometry of the tiling as a ``CuspGeometry``.
 
+        Walks the pattern once, placing each strip's cell corners at positions
+        drawn from ``STRIP_TEMPLATES[label]["geometry"]`` and translated by a
+        running ``offset`` in ``CyclotomicInt`` coordinates.  After each strip,
+        ``offset`` advances by that strip's ``shift``.
+
+        Some strip labels have two geometry variants (indexed by
+        ``tile_variant``); the variant toggles when the two-letter context
+        window equals ``"cc"`` or ``"de"``, matching the parity constraint
+        those adjacencies impose on the underlying tile orientation.
+
+        Triangle and square indices are assigned sequentially in pattern
+        order, matching the scheme used by :meth:`add_strip`, so each
+        ``Tri``/``Sqr`` key here corresponds to the same cell in
+        :attr:`strips`.
+
+        Returns:
+            A ``CuspGeometry`` with one corner-position entry per corner of
+            every cell in the tiling.
+        """
         n = len(self.long_cusp_pattern)
         cusp_geo = CuspGeometry()
 

@@ -59,7 +59,12 @@ def log_config(config):
     logging.info(f"traversal: {config['traversal']}")
 
 
-def solve(env_path, debug_draw: bool = False, debug_trace: bool = False):
+def solve(
+    env_path,
+    debug_draw: bool = False,
+    debug_trace: bool = False,
+    debug_draw_format: str = "png",
+):
     """Run the solver on a single search environment.
 
     Loads the config, builds the cusp tiling and construction, runs the
@@ -78,6 +83,9 @@ def solve(env_path, debug_draw: bool = False, debug_trace: bool = False):
         debug_trace: If True, append a per-iteration record to
             ``<env_path>/trace.jsonl`` containing the solver stack and
             any consistency violation. Off by default.
+        debug_draw_format: Output format for ``debug_draw``; one of
+            ``"png"``, ``"svg"``, or ``"tex"`` (TikZ snippet). Ignored
+            when ``debug_draw`` is False.
 
     Returns:
         ``"completed"`` if the solver finished the search, ``"stopped"``
@@ -176,7 +184,7 @@ def solve(env_path, debug_draw: bool = False, debug_trace: bool = False):
             draw_cusp(
                 geo,
                 construction,
-                str(debug_dir / f"step_{step_num:06d}.png"),
+                str(debug_dir / f"step_{step_num:06d}.{debug_draw_format}"),
                 annotations=annotations,
                 induced_cells=induced_cells,
                 bold_edge_cells=bold_edge_cells,
@@ -303,6 +311,15 @@ def main():
         help="Draw the cusp and embeddings at each solver step (slow)",
     )
     parser.add_argument(
+        "--debug-draw-format",
+        choices=("png", "svg", "tex"),
+        default="png",
+        help=(
+            "Output format for --debug-draw: png/svg (images) or tex "
+            "(TikZ snippets). Default: png."
+        ),
+    )
+    parser.add_argument(
         "--debug-trace",
         action="store_true",
         help="Append per-iteration stack snapshots to trace.jsonl (slow)",
@@ -312,7 +329,12 @@ def main():
     name = args.name
     env_path = Path(name)
 
-    solve(env_path, debug_draw=args.debug_draw, debug_trace=args.debug_trace)
+    solve(
+        env_path,
+        debug_draw=args.debug_draw,
+        debug_trace=args.debug_trace,
+        debug_draw_format=args.debug_draw_format,
+    )
 
 
 if __name__ == "__main__":
